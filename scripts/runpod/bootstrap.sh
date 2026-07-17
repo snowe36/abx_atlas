@@ -7,6 +7,7 @@
 set -uo pipefail
 
 REPO_DIR="${REPO_DIR:-/workspace/abx_atlas}"
+VENV_DIR="${VENV_DIR:-/workspace/venv}"
 cd "$REPO_DIR"
 
 # --- Safety net: self-terminate no matter what happens below --------------
@@ -28,7 +29,19 @@ else
   echo "[bootstrap] WARNING: RUNPOD_API_KEY/RUNPOD_POD_ID not set — no self-terminate watchdog!" >&2
 fi
 
+echo "[bootstrap] Creating / activating venv at ${VENV_DIR}..."
+# Official RunPod PyTorch images ship a PEP-668-managed system Python; always
+# install into a workspace venv so `pip install -e ".[gpu]"` works.
+if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
+  python3 -m venv --system-site-packages "${VENV_DIR}"
+fi
+# shellcheck disable=SC1091
+source "${VENV_DIR}/bin/activate"
+python -m pip install -U pip -q
+
 echo "[bootstrap] Installing abx-atlas with the gpu extra..."
+# Prefer the image's preinstalled torch if present; still pull the rest of the
+# gpu extra (torch_geometric, transformers, optuna, …).
 pip install -e ".[gpu]" -q
 
 WITH_GNN="${WITH_GNN:-1}"

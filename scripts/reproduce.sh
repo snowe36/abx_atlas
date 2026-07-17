@@ -24,7 +24,7 @@ if (( MAJOR < 3 || (MAJOR == 3 && MINOR < 11) )); then
 fi
 
 "$PYTHON" -m pip install -e ".[dev]"
-abx-download --max-per-organism "${MAX_PER_ORG:-5000}"
+abx-download --max-per-organism "${MAX_PER_ORG:-20000}" --all-organisms
 abx-atlas
 abx-qsar
 
