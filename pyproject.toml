@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "abx-atlas"
+version = "0.1.0"
+description = "Leakage-aware atlas of antibacterial chemical space for cell-envelope targets (ChEMBL, CPU-only)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Eric Snow" }]
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "scikit-learn>=1.3",
+  "rdkit>=2023.9.1",
+  "chembl-webresource-client>=0.10.9",
+  "requests>=2.31",
+  "matplotlib>=3.7",
+  "seaborn>=0.13",
+  "pyarrow>=14.0",
+  "tqdm>=4.66",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+abx-download = "abxatlas.cli:download_main"
+abx-atlas = "abxatlas.cli:atlas_main"
+abx-qsar = "abxatlas.cli:qsar_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+abxatlas = ["resources/*.yaml"]
