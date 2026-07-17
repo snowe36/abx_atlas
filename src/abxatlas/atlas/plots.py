@@ -269,7 +269,7 @@ def plot_fig1_chemspace_atlas(
         ),
         (
             "Gram− activity (pChEMBL ≥ 5)",
-            df["gram_neg_active"].map({1: "Active", 0: "Inactive", 1.0: "Active", 0.0: "Inactive"}).fillna("No label")
+            df["gram_neg_active"].map({1: "Active", 0: "Inactive"}).fillna("No label")
             if "gram_neg_active" in df.columns
             else pd.Series("No label", index=df.index),
             {"Active": "#1e8449", "Inactive": "#922b21", "No label": "#bdc3c7"},
@@ -288,7 +288,7 @@ def plot_fig1_chemspace_atlas(
     ]
 
     fig, axes = plt.subplots(1, 3, figsize=(14, 4.6), sharex=True, sharey=True)
-    for ax, (title, cats, palette) in zip(axes, panels):
+    for ax, (title, cats, palette) in zip(axes, panels, strict=True):
         cats = cats.astype(str)
         for cat in sorted(cats.unique()):
             m = cats == cat

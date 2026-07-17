@@ -95,7 +95,13 @@ def _majority_or_envelope(series: pd.Series) -> str:
 
 
 def _compound_table(agg: pd.DataFrame, assay_df: pd.DataFrame) -> pd.DataFrame:
-    """Build molecule-level labels for Gram+/− and MoA buckets."""
+    """Build molecule-level labels for Gram+/− and MoA buckets.
+
+    Pre-groups assay_df by molecule once (O(n)) instead of re-scanning the
+    whole assay-level frame per molecule (O(n_molecules * n_assay_rows)) —
+    matters once the curated set is tens of thousands of compounds.
+    """
+    assay_moa_by_mol = assay_df.groupby("molecule_chembl_id")["moa_bucket"]
     rows = []
     for mid, g in agg.groupby("molecule_chembl_id"):
         smiles = g["smiles"].iloc[0]
@@ -107,10 +113,11 @@ def _compound_table(agg: pd.DataFrame, assay_df: pd.DataFrame) -> pd.DataFrame:
         has_gn = len(gn) > 0
         has_gp = len(gp) > 0
 
-        moa = _majority_or_envelope(g["moa_bucket"])
-        # Prefer assay-level envelope evidence
-        mol_assays = assay_df[assay_df["molecule_chembl_id"] == mid]
-        moa = _majority_or_envelope(mol_assays["moa_bucket"])
+        # Prefer assay-level envelope evidence; fall back to the agg-level bucket.
+        if mid in assay_moa_by_mol.groups:
+            moa = _majority_or_envelope(assay_moa_by_mol.get_group(mid))
+        else:
+            moa = _majority_or_envelope(g["moa_bucket"])
 
         is_np = bool(g["is_natural_product"].max())
         year = None

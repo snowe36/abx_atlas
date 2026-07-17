@@ -171,6 +171,19 @@ def train_gnn(
     return model, device
 
 
+def _tensor_to_numpy(t) -> np.ndarray:
+    """Convert a torch tensor to numpy, with a list fallback for ABI mismatches.
+
+    Some laptop torch builds (older wheels) refuse to talk to NumPy 2.x; the
+    list path is slower but keeps local smoke tests working. CUDA pods with a
+    matching torch/numpy pair take the fast path.
+    """
+    try:
+        return t.detach().cpu().numpy()
+    except (RuntimeError, ImportError):
+        return np.asarray(t.detach().cpu().tolist())
+
+
 def _eval_auc(model: GNNClassifier, loader: DataLoader, device: str) -> float:
     proba, y = _predict_loader(model, loader, device)
     if len(np.unique(y)) < 2:
@@ -185,8 +198,8 @@ def _predict_loader(model: GNNClassifier, loader: DataLoader, device: str) -> tu
         for batch in loader:
             batch = batch.to(device)
             logits = model(batch.x, batch.edge_index, batch.batch)
-            probs.append(torch.sigmoid(logits).cpu().numpy())
-            ys.append(batch.y.cpu().numpy())
+            probs.append(_tensor_to_numpy(torch.sigmoid(logits)))
+            ys.append(_tensor_to_numpy(batch.y))
     return np.concatenate(probs), np.concatenate(ys)
 
 
@@ -198,7 +211,7 @@ def predict_gnn(model: GNNClassifier, graphs: list, device: str, batch_size: int
         for batch in loader:
             batch = batch.to(device)
             logits = model(batch.x, batch.edge_index, batch.batch)
-            probs.append(torch.sigmoid(logits).cpu().numpy())
+            probs.append(_tensor_to_numpy(torch.sigmoid(logits)))
     return np.concatenate(probs) if probs else np.array([])
 
 

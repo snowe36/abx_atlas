@@ -66,7 +66,7 @@ def _load_api_key() -> str:
 
 
 def _ssh_opts(port: int) -> list[str]:
-    return [
+    opts = [
         "-p",
         str(port),
         "-o",
@@ -76,6 +76,17 @@ def _ssh_opts(port: int) -> list[str]:
         "-o",
         "ConnectTimeout=10",
     ]
+    # Prefer a dedicated RunPod key if present; otherwise fall back to the
+    # agent's default identities (user must have added a pubkey to RunPod).
+    for candidate in (
+        Path.home() / ".ssh" / "runpod_ed25519",
+        Path.home() / ".ssh" / "id_ed25519",
+        Path.home() / ".ssh" / "id_rsa",
+    ):
+        if candidate.exists():
+            opts.extend(["-i", str(candidate), "-o", "IdentitiesOnly=yes"])
+            break
+    return opts
 
 
 def wait_for_ssh(runpod_mod, pod_id: str, timeout_s: int) -> tuple[str, int]:
@@ -235,7 +246,9 @@ def main(argv: list[str] | None = None) -> int:
         rsync_up(ip, port)
 
         print("[launch] Running bootstrap.sh on the pod (streaming below)...")
-        status = run_bootstrap(ip, port, env_vars)
+        # Pass pod id explicitly so the watchdog can self-terminate even if the
+        # platform-injected RUNPOD_POD_ID env var is missing on some images.
+        status = run_bootstrap(ip, port, {**env_vars, "RUNPOD_POD_ID": pod_id})
         print(f"[launch] Remote job exited with status {status}")
 
         print("[launch] Syncing results back...")
