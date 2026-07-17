@@ -61,12 +61,49 @@ def atlas_main(argv: list[str] | None = None) -> int:
 def qsar_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run scaffold-split Gram-negative QSAR")
     parser.add_argument("--test-size", type=float, default=0.2)
+    parser.add_argument(
+        "--with-gnn",
+        action="store_true",
+        help="Also train/evaluate a from-scratch GNN (requires: pip install -e '.[gpu]')",
+    )
+    parser.add_argument("--gnn-epochs", type=int, default=60)
+    parser.add_argument(
+        "--gnn-hpo-trials",
+        type=int,
+        default=0,
+        help="Optuna trials for GNN hyperparameter search (0 = skip, use defaults)",
+    )
+    parser.add_argument(
+        "--with-pretrained",
+        action="store_true",
+        help=(
+            "Also fine-tune/evaluate a pretrained chemical transformer "
+            "(requires: pip install -e '.[gpu]')"
+        ),
+    )
+    parser.add_argument("--pretrained-model", default="seyonec/ChemBERTa-zinc-base-v1")
+    parser.add_argument("--pretrained-epochs", type=int, default=3)
+    parser.add_argument(
+        "--pretrained-hpo-trials",
+        type=int,
+        default=0,
+        help="Optuna trials for the pretrained transformer's hyperparameter search",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)
     from abxatlas.models.run import run_qsar
 
-    run_qsar(test_size=args.test_size)
+    run_qsar(
+        test_size=args.test_size,
+        with_gnn=args.with_gnn,
+        gnn_epochs=args.gnn_epochs,
+        gnn_hpo_trials=args.gnn_hpo_trials,
+        with_pretrained=args.with_pretrained,
+        pretrained_model=args.pretrained_model,
+        pretrained_epochs=args.pretrained_epochs,
+        pretrained_hpo_trials=args.pretrained_hpo_trials,
+    )
     return 0
 
 
