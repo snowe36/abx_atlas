@@ -105,8 +105,11 @@ On held-out scaffolds, RF improves with more train data then **plateaus** (Î” â‰
 
 ## Reproducibility
 
+Requires **Python 3.11+**.
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -U pip
 pip install -e ".[dev]"
 bash scripts/reproduce.sh
 # or:
