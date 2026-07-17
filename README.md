@@ -132,6 +132,14 @@ CPU only. MIT license. Cite ChEMBL when using regenerated tables ([CITATION.cff]
 
 ---
 
+## Acknowledgments
+
+- Bioactivity data from [ChEMBL](https://www.ebi.ac.uk/chembl/) (EMBL-EBI).
+- Cheminformatics via [RDKit](https://www.rdkit.org/); modeling via [scikit-learn](https://scikit-learn.org/).
+- Portions of the code and documentation were drafted with the assistance of AI coding tools and reviewed by the author.
+
+---
+
 ## Future directions
 
 - Integrate **COCONUT** / NPAtlas natural-product annotations
