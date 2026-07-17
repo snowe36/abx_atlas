@@ -71,7 +71,7 @@ class GNNClassifier(nn.Module):
 
     def forward(self, x, edge_index, batch):
         h = x
-        for conv, bn in zip(self.convs, self.bns):
+        for conv, bn in zip(self.convs, self.bns, strict=True):
             h = conv(h, edge_index)
             h = bn(h)
             h = F.relu(h)
@@ -109,8 +109,11 @@ def train_gnn(
     """
     device = _device(device)
     y = np.asarray(y_train, dtype=np.float32)
-    graphs = list(train_graphs)
-    for g, label in zip(graphs, y):
+    # Clone before attaching labels — train_graphs are shared Data objects
+    # (slices of a cached graph list reused across splits/HPO trials), and
+    # mutating them in place would leak `.y` across unrelated evaluations.
+    graphs = [g.clone() for g in train_graphs]
+    for g, label in zip(graphs, y, strict=True):
         g.y = torch.tensor([float(label)])
 
     rng = np.random.RandomState(random_state)
