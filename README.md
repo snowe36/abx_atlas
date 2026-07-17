@@ -28,9 +28,11 @@ This is an evaluation-hygiene / leakage-diagnostic problem with explicit negativ
 4. **Interpret** failures (bit weights, FP/FN scaffolds, nearest-train-neighbor Tanimoto)
 5. **Ablate** against optional GPU deep models (from-scratch GNN + fine-tuned ChemBERTa) on the *same* splits — same protocol, honest comparison
 
-![Leakage-aware QSAR benchmark: ROC-AUC drops from random to scaffold to temporal holdouts](reports/figures/fig3_leakage_rocauc.png)
+<p align="center">
+  <img src="reports/figures/fig3_leakage_rocauc.png" alt="Leakage-aware QSAR: ROC-AUC across random, scaffold, and time splits for logreg, RF, GNN, and ChemBERTa" width="720"/>
+</p>
 
-*Figure 3 (hero). Every model looks strong on a random split. Re-split by chemical scaffold or by publication year and the story changes — that gap **is** the finding.*
+<p align="center"><em>Figure 3 (hero). Every model looks strong on a random split. Re-split by chemical scaffold or by publication year and the story changes — that gap <strong>is</strong> the finding.</em></p>
 
 ---
 
@@ -87,9 +89,29 @@ Antibacterial compounds occupy **broad** Morgan-FP space with substantial scaffo
 | Envelope-tagged | **354** compounds (still a minority — organism-level MIC assays rarely name molecular targets) |
 | Natural products | **361** compounds (~0.9%) |
 
-![Chemical space atlas](reports/figures/fig1_chemspace_atlas.png)
+<p align="center">
+  <img src="reports/figures/fig1_chemspace_atlas.png" alt="Antibacterial chemical space: Morgan FP PCA colored by organism class, Gram- activity, and MoA bucket" width="900"/>
+</p>
 
-![Scaffold diversity](reports/figures/fig2_scaffold_diversity.png)
+<p align="center"><em>Figure 1. Morgan-FP PCA atlas — organism class, Gram− activity, and MoA bucket overlaid on the same space.</em></p>
+
+<p align="center">
+  <img src="reports/figures/fig2_scaffold_diversity.png" alt="Scaffold diversity: 38,699 compounds vs 20,128 unique scaffolds; most scaffolds are rare" width="720"/>
+</p>
+
+<p align="center"><em>Figure 2. Scaffold diversity — ratio 0.52, with a long tail of rare chemotypes (hard for random splits).</em></p>
+
+<p align="center">
+  <img src="reports/figures/gram_label_balance.png" alt="Binary label balance for Gram-negative and Gram-positive activity" width="640"/>
+</p>
+
+<p align="center"><em>Label balance at pChEMBL ≥ 5. The primary task (Gram−) is smaller and active-skewed; Gram+ has far more labeled compounds.</em></p>
+
+<p align="center">
+  <img src="reports/figures/top_scaffolds.png" alt="Top Bemis-Murcko scaffolds by compound count" width="640"/>
+</p>
+
+<p align="center"><em>Top Bemis–Murcko scaffolds — benzene dominates; most other scaffolds are far rarer.</em></p>
 
 Full summary: [`data/processed/atlas_summary.csv`](data/processed/atlas_summary.csv).
 
@@ -117,6 +139,12 @@ CPU + GPU models on the expanded Gram− task (n=5,572). Deep models trained on 
 | Scaffold | **0.73** | **0.84** | **0.79** | **0.79** |
 | Time | **0.43** | **0.56** | **0.48** | **0.60** |
 
+<p align="center">
+  <img src="reports/figures/fig3_leakage_rocauc.png" alt="ROC-AUC by split for logreg, RF, GNN, and ChemBERTa" width="720"/>
+</p>
+
+<p align="center"><em>Figure 3. Leakage-aware Gram-negative QSAR — RF leads on random/scaffold; ChemBERTa is strongest on the temporal holdout; none erase the drop.</em></p>
+
 Mean optimistic gap (random − scaffold, all four models): **~0.04**. Neither the from-scratch GNN nor fine-tuned ChemBERTa erases the leakage story — RF still leads on random/scaffold, while ChemBERTa is the strongest on the temporal holdout.
 
 Full metrics: [`data/processed/qsar_leakage_results.csv`](data/processed/qsar_leakage_results.csv) · HPO configs: [`data/processed/qsar_meta.json`](data/processed/qsar_meta.json).
@@ -127,14 +155,34 @@ Full metrics: [`data/processed/qsar_leakage_results.csv`](data/processed/qsar_le
 
 On held-out scaffolds, both CPU models improve with more train data then **plateau** (RF Δ ≈ +0.11, logreg Δ ≈ +0.07 from 10%→100% train). More ChEMBL rows alone do not erase chemotype / era bias.
 
-![Learning curve](reports/figures/fig4_learning_curve.png)
+<p align="center">
+  <img src="reports/figures/fig4_learning_curve.png" alt="Scaffold-split learning curve: ROC-AUC vs training set size for logreg and RF" width="640"/>
+</p>
+
+<p align="center"><em>Figure 4. Does more ChEMBL data fix scaffold generalization? RF plateaus ~0.84; logreg climbs more slowly.</em></p>
 
 Interpretation on the scaffold-split logreg:
 
 - False positives are often **structurally close** to actives in the training set (high Tanimoto to nearest neighbor) yet sit on **novel scaffolds** at test time
 - Logreg bit weights and permutation importance highlight associative fingerprint patterns — not causal substructures
 
-![Error neighbors](reports/figures/fig5_error_neighbors.png)
+<p align="center">
+  <img src="reports/figures/fig5_error_neighbors.png" alt="Nearest-train-neighbor Tanimoto and label agreement for TP, FP, and FN" width="720"/>
+</p>
+
+<p align="center"><em>Figure 5. What are TP / FP / FN near in chemical space? Correct calls sit closer to same-label train neighbors; errors do not.</em></p>
+
+<p align="center">
+  <img src="reports/figures/qsar_logreg_bit_weights.png" alt="Top positive and negative Morgan-bit logistic regression coefficients" width="640"/>
+</p>
+
+<p align="center"><em>Top ± Morgan-bit weights — associative fingerprint patterns, not causal substructures.</em></p>
+
+<p align="center">
+  <img src="reports/figures/qsar_error_scaffolds.png" alt="Scaffolds enriched in false positives and false negatives on the scaffold split" width="640"/>
+</p>
+
+<p align="center"><em>Scaffolds enriched in FP / FN on the scaffold-split test — model blind spots by chemotype.</em></p>
 
 **Takeaway:** apparent Gram− QSAR strength is partly **chemotype memorization** and **dataset era**. Scaffold- and time-aware evaluation makes that visible — and the GPU models shift the absolute numbers without changing that core finding.
 
