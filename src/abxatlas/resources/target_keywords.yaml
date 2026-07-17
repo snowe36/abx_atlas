@@ -1,0 +1,92 @@
+# Keywords used to bucket ChEMBL target names into cell-envelope vs other.
+# Matching is case-insensitive substring match on preferred target name.
+
+cell_envelope:
+  - penicillin-binding protein
+  - penicillin binding protein
+  - peptidoglycan
+  - murA
+  - murB
+  - murC
+  - murD
+  - murE
+  - murF
+  - murG
+  - murJ
+  - mraY
+  - UDP-N-acetylglucosamine
+  - UDP-N-acetylmuramate
+  - lipid II
+  - lipid A
+  - LpxA
+  - LpxC
+  - LpxD
+  - LpxH
+  - LpxK
+  - BamA
+  - LptD
+  - LptB
+  - LolC
+  - LolE
+  - LolD
+  - outer membrane
+  - cell wall
+  - transpeptidase
+  - D-alanyl-D-alanine
+  - alanine racemase
+  - FemA
+  - FemB
+  - FemX
+  - WaaL
+  - KdsA
+  - KdsB
+  - KdsC
+  - KdsD
+
+# Explicitly non-envelope (helps avoid false positives like "cell wall stress" assays)
+exclude_from_envelope:
+  - beta-lactamase
+  - β-lactamase
+  - DNA gyrase
+  - topoisomerase
+  - RNA polymerase
+  - ribosome
+  - ribosomal
+  - dihydrofolate
+  - DHFR
+  - folate
+
+gram_negative_organisms:
+  - Escherichia coli
+  - Pseudomonas aeruginosa
+  - Klebsiella pneumoniae
+  - Acinetobacter baumannii
+  - Enterobacter cloacae
+  - Enterobacter aerogenes
+  - Salmonella enterica
+  - Salmonella typhimurium
+  - Helicobacter pylori
+  - Haemophilus influenzae
+  - Neisseria gonorrhoeae
+  - Neisseria meningitidis
+  - Proteus mirabilis
+  - Serratia marcescens
+  - Stenotrophomonas maltophilia
+  - Vibrio cholerae
+  - Yersinia pestis
+  - Campylobacter jejuni
+  - Bacteroides fragilis
+
+gram_positive_organisms:
+  - Staphylococcus aureus
+  - Staphylococcus epidermidis
+  - Streptococcus pneumoniae
+  - Streptococcus pyogenes
+  - Enterococcus faecalis
+  - Enterococcus faecium
+  - Bacillus subtilis
+  - Bacillus anthracis
+  - Clostridium difficile
+  - Clostridioides difficile
+  - Mycobacterium tuberculosis
+  - Listeria monocytogenes
