@@ -209,6 +209,91 @@ def plot_error_scaffold_rates(
     return out
 
 
+def nearest_train_neighbors(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    smiles_train: list[str] | pd.Series,
+    X_query: np.ndarray,
+    y_query: np.ndarray,
+    smiles_query: list[str] | pd.Series,
+    error_tag: np.ndarray,
+    classes: tuple[str, ...] = ("TP", "FP", "FN"),
+    n_examples: int = 5,
+    k: int = 3,
+    random_state: int = 42,
+) -> pd.DataFrame:
+    """For sampled TP/FP/FN queries, find k nearest train neighbors (Tanimoto/Jaccard)."""
+    from sklearn.metrics import pairwise_distances
+
+    rng = np.random.RandomState(random_state)
+    smiles_train = pd.Series(list(smiles_train)).reset_index(drop=True)
+    smiles_query = pd.Series(list(smiles_query)).reset_index(drop=True)
+    rows = []
+    # Jaccard distance on binary fingerprints ≡ 1 − Tanimoto
+    X_train_b = X_train.astype(bool)
+    X_query_b = X_query.astype(bool)
+    for label in classes:
+        idxs = np.where(error_tag == label)[0]
+        if len(idxs) == 0:
+            continue
+        take = min(n_examples, len(idxs))
+        chosen = rng.choice(idxs, size=take, replace=False)
+        dist = pairwise_distances(X_query_b[chosen], X_train_b, metric="jaccard")
+        for local_i, qi in enumerate(chosen):
+            order = np.argsort(dist[local_i])[:k]
+            for rank, ti in enumerate(order, start=1):
+                rows.append(
+                    {
+                        "error_class": label,
+                        "query_idx": int(qi),
+                        "query_smiles": smiles_query.iloc[qi],
+                        "query_label": int(y_query[qi]),
+                        "neighbor_rank": rank,
+                        "neighbor_idx": int(ti),
+                        "neighbor_smiles": smiles_train.iloc[ti],
+                        "neighbor_label": int(y_train[ti]),
+                        "tanimoto": float(1.0 - dist[local_i, ti]),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
+def plot_neighbor_summary(
+    neighbors: pd.DataFrame,
+    out_path: Path | None = None,
+) -> Path | None:
+    """Bar summary: mean Tanimoto of nearest train neighbor by error class."""
+    ensure_dirs()
+    if neighbors.empty:
+        return None
+    first = neighbors[neighbors["neighbor_rank"] == 1]
+    if first.empty:
+        return None
+    means = first.groupby("error_class")["tanimoto"].mean()
+    same = first.assign(same_label=lambda d: d["query_label"] == d["neighbor_label"])
+    same_rate = same.groupby("error_class")["same_label"].mean()
+
+    order = [c for c in ("TP", "FP", "FN") if c in means.index]
+    fig, axes = plt.subplots(1, 2, figsize=(9, 3.8))
+    axes[0].bar(order, [means[c] for c in order], color=["#1e8449", "#b9770e", "#1b4f72"])
+    axes[0].set_ylim(0, 1)
+    axes[0].set_ylabel("Mean Tanimoto to nearest train neighbor")
+    axes[0].set_title("Structural proximity to training set")
+    axes[1].bar(
+        order, [same_rate.get(c, 0) for c in order], color=["#1e8449", "#b9770e", "#1b4f72"]
+    )
+    axes[1].set_ylim(0, 1)
+    axes[1].set_ylabel("Fraction with same activity label")
+    axes[1].set_title("Nearest neighbor label agreement")
+    fig.suptitle("Figure 5. What are TP / FP / FN near in chemical space?", y=1.02)
+    fig.tight_layout()
+    out = out_path or (FIGURES / "fig5_error_neighbors.png")
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("Wrote %s", out)
+    return out
+
+
 def run_interpretation(
     model: Pipeline,
     X_train: np.ndarray,
@@ -216,6 +301,7 @@ def run_interpretation(
     X_test: np.ndarray,
     y_test: np.ndarray,
     smiles_test: list[str] | pd.Series,
+    smiles_train: list[str] | pd.Series | None = None,
     top_bits: int = 40,
     n_perm_bits: int = 30,
 ) -> dict:
@@ -248,12 +334,33 @@ def run_interpretation(
     fig_weights = plot_logreg_weights(weights, top_n=min(20, top_bits // 2 or 20))
     fig_errors = plot_error_scaffold_rates(enrichment)
 
+    neighbor_path = None
+    fig_neighbors = None
+    if smiles_train is not None:
+        try:
+            neighbors = nearest_train_neighbors(
+                X_train,
+                y_train,
+                smiles_train,
+                X_test,
+                y_test,
+                smiles_test,
+                err,
+            )
+            neighbor_path = PROCESSED / "qsar_error_neighbors.csv"
+            neighbors.to_csv(neighbor_path, index=False)
+            fig_neighbors = plot_neighbor_summary(neighbors)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Nearest-neighbor analysis failed: %s", exc)
+
+    figures = [str(p) for p in (fig_weights, fig_errors, fig_neighbors) if p is not None]
     return {
         "error_counts": err_counts,
         "weights_csv": str(weights_path),
         "error_scaffolds_csv": str(enrich_path),
+        "neighbors_csv": str(neighbor_path) if neighbor_path else None,
         "permutation_csv": str(perm_path) if perm_path else None,
-        "figures": [str(p) for p in (fig_weights, fig_errors) if p is not None],
+        "figures": figures,
         "n_test": int(len(y_test)),
         "top_positive_bits": weights.nlargest(10, "weight")["bit"].tolist(),
         "top_negative_bits": weights.nsmallest(10, "weight")["bit"].tolist(),

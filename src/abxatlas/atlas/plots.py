@@ -234,3 +234,128 @@ def plot_gram_label_balance(
     fig.savefig(out, dpi=180, bbox_inches="tight")
     plt.close(fig)
     return out
+
+
+def plot_fig1_chemspace_atlas(
+    compounds: pd.DataFrame,
+    out_path: Path | None = None,
+    max_points: int = 5000,
+) -> Path:
+    """Figure 1: three-panel PCA (Gram label, Gram− activity, MoA bucket)."""
+    ensure_dirs()
+    _style()
+    df, xy = _pca_xy(compounds, max_points=max_points)
+
+    # Derive a Gram stain view from available labels
+    gram = pd.Series("unknown", index=df.index, dtype=object)
+    if "has_gram_neg_assay" in df.columns and "has_gram_pos_assay" in df.columns:
+        gn = df["has_gram_neg_assay"].fillna(False).astype(bool)
+        gp = df["has_gram_pos_assay"].fillna(False).astype(bool)
+        gram.loc[gn & ~gp] = "Gram− only"
+        gram.loc[gp & ~gn] = "Gram+ only"
+        gram.loc[gn & gp] = "Both"
+        gram.loc[~gn & ~gp] = "Neither / unknown"
+
+    panels = [
+        (
+            "Assay organism class",
+            gram,
+            {
+                "Gram− only": "#1b4f72",
+                "Gram+ only": "#b9770e",
+                "Both": "#1e8449",
+                "Neither / unknown": "#bdc3c7",
+            },
+        ),
+        (
+            "Gram− activity (pChEMBL ≥ 5)",
+            df["gram_neg_active"].map({1: "Active", 0: "Inactive", 1.0: "Active", 0.0: "Inactive"}).fillna("No label")
+            if "gram_neg_active" in df.columns
+            else pd.Series("No label", index=df.index),
+            {"Active": "#1e8449", "Inactive": "#922b21", "No label": "#bdc3c7"},
+        ),
+        (
+            "MoA bucket",
+            df["moa_bucket"].fillna("unknown").astype(str)
+            if "moa_bucket" in df.columns
+            else pd.Series("unknown", index=df.index),
+            {
+                "cell_envelope": "#1b4f72",
+                "other": "#b9770e",
+                "unknown": "#7f8c8d",
+            },
+        ),
+    ]
+
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.6), sharex=True, sharey=True)
+    for ax, (title, cats, palette) in zip(axes, panels):
+        cats = cats.astype(str)
+        for cat in sorted(cats.unique()):
+            m = cats == cat
+            ax.scatter(
+                xy[m.to_numpy(), 0],
+                xy[m.to_numpy(), 1],
+                s=10,
+                alpha=0.5,
+                c=palette.get(cat, "#7f8c8d"),
+                edgecolors="none",
+                label=cat,
+            )
+        ax.set_title(title, fontsize=11)
+        ax.set_xlabel("PCA 1")
+        ax.legend(frameon=False, markerscale=1.8, fontsize=8, loc="best")
+    axes[0].set_ylabel("PCA 2 (Morgan FP)")
+    fig.suptitle(
+        "Figure 1. Antibacterial chemical space (Morgan FP PCA)",
+        y=1.02,
+        fontsize=13,
+    )
+    fig.tight_layout()
+    out = out_path or (FIGURES / "fig1_chemspace_atlas.png")
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
+def plot_fig2_scaffold_diversity(
+    compounds: pd.DataFrame,
+    out_path: Path | None = None,
+) -> Path:
+    """Figure 2: compound vs scaffold counts + frequency distribution."""
+    ensure_dirs()
+    _style()
+    scaf = scaffold_series(compounds["smiles"].tolist())
+    n_comp = int(len(compounds))
+    n_scaf = int(scaf.nunique(dropna=True))
+    freq = scaf.value_counts(dropna=True)
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.2))
+    axes[0].bar(
+        ["Compounds", "Unique scaffolds"],
+        [n_comp, n_scaf],
+        color=["#1b4f72", "#5d6d7e"],
+        width=0.55,
+    )
+    axes[0].set_ylabel("Count")
+    axes[0].set_title(f"Scaffold ratio = {n_scaf / n_comp:.2f}" if n_comp else "")
+    for i, v in enumerate([n_comp, n_scaf]):
+        axes[0].text(i, v, f" {v:,}", ha="center", va="bottom", fontsize=10)
+
+    # Log-scale histogram of scaffold frequencies
+    if len(freq):
+        axes[1].hist(
+            freq.values,
+            bins=min(40, max(10, int(np.sqrt(len(freq))))),
+            color="#1b4f72",
+            edgecolor="white",
+            log=True,
+        )
+    axes[1].set_xlabel("Compounds per scaffold")
+    axes[1].set_ylabel("Number of scaffolds (log)")
+    axes[1].set_title("Most scaffolds are rare — hard for random splits")
+    fig.suptitle("Figure 2. Bemis–Murcko scaffold diversity", y=1.02, fontsize=13)
+    fig.tight_layout()
+    out = out_path or (FIGURES / "fig2_scaffold_diversity.png")
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    return out

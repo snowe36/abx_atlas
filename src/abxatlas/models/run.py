@@ -14,6 +14,7 @@ from abxatlas.config import RANDOM_STATE
 from abxatlas.data.curate import load_curated
 from abxatlas.featurize.fingerprints import morgan_fps
 from abxatlas.models.interpret import run_interpretation
+from abxatlas.models.learning_curve import run_learning_curve
 from abxatlas.models.qsar import SplitResult, evaluate_split, make_models
 from abxatlas.models.splits import (
     random_split_indices,
@@ -72,6 +73,11 @@ def run_qsar(test_size: float = 0.2) -> pd.DataFrame:
     gap = _optimistic_gap(results_df)
 
     interpret_meta = _run_scaffold_interpretation(df, X, y, splits["scaffold"])
+    curve_meta = {}
+    try:
+        curve_meta = run_learning_curve(X, y, splits["scaffold"][0], splits["scaffold"][1])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Learning curve failed: %s", exc)
 
     meta = {
         "n_compounds": int(len(df)),
@@ -80,6 +86,7 @@ def run_qsar(test_size: float = 0.2) -> pd.DataFrame:
         "optimistic_gap_roc_auc": gap,
         "primary_task": "gram_neg_active (pChEMBL >= 5)",
         "interpretation": interpret_meta,
+        "learning_curve": curve_meta,
     }
     (PROCESSED / "qsar_meta.json").write_text(json.dumps(meta, indent=2))
     print(results_df.to_string(index=False))
@@ -95,6 +102,8 @@ def run_qsar(test_size: float = 0.2) -> pd.DataFrame:
             f"TP={ec.get('TP', 0)} FP={ec.get('FP', 0)} "
             f"FN={ec.get('FN', 0)} TN={ec.get('TN', 0)}"
         )
+    if curve_meta.get("plateau_hint"):
+        print(f"Learning curve: {curve_meta['plateau_hint']}")
     return results_df
 
 
@@ -119,6 +128,7 @@ def _run_scaffold_interpretation(
             X_test=X[te],
             y_test=y[te],
             smiles_test=df.loc[te, "smiles"],
+            smiles_train=df.loc[tr, "smiles"],
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Interpretation failed: %s", exc)
@@ -141,31 +151,45 @@ def _optimistic_gap(results: pd.DataFrame) -> dict:
 
 
 def _plot_leakage(results: pd.DataFrame) -> None:
+    """Figure 3 (hero): random vs scaffold vs time ROC-AUC."""
     if results.empty:
         return
-    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    fig, ax = plt.subplots(figsize=(7.5, 4.8))
     split_order = [
         s for s in ["random", "scaffold", "time"] if s in results["split_name"].unique()
     ]
     models = sorted(results["model_name"].unique())
     x = np.arange(len(split_order))
-    width = 0.25
+    width = 0.32
     colors = {"logreg": "#1b4f72", "rf": "#b9770e"}
     for i, model in enumerate(models):
         subset = results[results["model_name"] == model].set_index("split_name")
         vals = [
             subset.loc[s, "roc_auc"] if s in subset.index else np.nan for s in split_order
         ]
-        ax.bar(x + i * width, vals, width=width, label=model, color=colors.get(model))
-    ax.set_xticks(x + width)
+        bars = ax.bar(
+            x + i * width, vals, width=width, label=model, color=colors.get(model)
+        )
+        for b, v in zip(bars, vals):
+            if np.isfinite(v):
+                ax.text(
+                    b.get_x() + b.get_width() / 2,
+                    v + 0.015,
+                    f"{v:.2f}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=9,
+                )
+    ax.set_xticks(x + width * (len(models) - 1) / 2)
     ax.set_xticklabels(split_order)
     ax.set_ylabel("ROC-AUC")
-    ax.set_ylim(0.4, 1.0)
-    ax.set_title("Gram-negative QSAR: random vs scaffold (leakage) splits")
+    ax.set_ylim(0.4, 1.05)
+    ax.set_title("Figure 3. Leakage-aware Gram-negative QSAR (hero result)")
     ax.axhline(0.5, color="#999999", lw=0.8, ls="--")
     ax.legend(frameon=False)
     fig.tight_layout()
-    out = FIGURES / "qsar_leakage_rocauc.png"
-    fig.savefig(out, dpi=180)
+    for name in ("qsar_leakage_rocauc.png", "fig3_leakage_rocauc.png"):
+        out = FIGURES / name
+        fig.savefig(out, dpi=200)
+        logger.info("Wrote %s", out)
     plt.close(fig)
-    logger.info("Wrote %s", out)

@@ -15,10 +15,10 @@ def _normalize(text: str | None) -> str:
     return str(text).strip().lower()
 
 
-def bucket_target(target_name: str | None, keywords: dict | None = None) -> str:
-    """Return cell_envelope | other | unknown from preferred target name."""
+def bucket_text(text: str | None, keywords: dict | None = None) -> str:
+    """Return cell_envelope | other | unknown from free text (target or assay)."""
     kw = keywords or load_keywords()
-    name = _normalize(target_name)
+    name = _normalize(text)
     if not name:
         return "unknown"
 
@@ -30,9 +30,22 @@ def bucket_target(target_name: str | None, keywords: dict | None = None) -> str:
         if hit.lower() in name:
             return "cell_envelope"
 
+    return "unknown"
+
+
+def bucket_target(target_name: str | None, keywords: dict | None = None) -> str:
+    """Return cell_envelope | other | unknown from preferred target name."""
+    kw = keywords or load_keywords()
+    name = _normalize(target_name)
+    if not name:
+        return "unknown"
+
+    bucket = bucket_text(name, kw)
+    if bucket != "unknown":
+        return bucket
+
     # Named molecular targets that are not envelope → other; organism-level → unknown
-    if name and name not in {"unchecked", "no target assigned"}:
-        # Heuristic: enzyme/protein-like names count as other MoA
+    if name not in {"unchecked", "no target assigned"}:
         if any(
             token in name
             for token in (
@@ -70,14 +83,26 @@ def gram_stain(organism: str | None, keywords: dict | None = None) -> str:
 
 
 def annotate_frame(df: pd.DataFrame) -> pd.DataFrame:
-    """Add moa_bucket, gram_stain, and coerce natural_product flag."""
+    """Add moa_bucket, gram_stain, and coerce natural_product flag.
+
+    MoA uses target preferred name first; if still unknown, falls back to
+    assay_description text (many organism-level MIC rows lack a molecular target).
+    """
     out = df.copy()
     kw = load_keywords()
     target_col = "target_name" if "target_name" in out.columns else "pref_name"
     if target_col not in out.columns:
         out["target_name"] = None
         target_col = "target_name"
+
     out["moa_bucket"] = out[target_col].map(lambda x: bucket_target(x, kw))
+
+    if "assay_description" in out.columns:
+        assay_bucket = out["assay_description"].map(lambda x: bucket_text(x, kw))
+        # Only upgrade unknown → envelope (do not invent "other" from assay prose)
+        upgrade = out["moa_bucket"].eq("unknown") & assay_bucket.eq("cell_envelope")
+        out.loc[upgrade, "moa_bucket"] = "cell_envelope"
+
     org_col = "organism" if "organism" in out.columns else "assay_organism"
     if org_col not in out.columns:
         out["organism"] = None

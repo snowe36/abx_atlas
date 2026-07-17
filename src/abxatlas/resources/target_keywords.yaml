@@ -1,10 +1,12 @@
-# Keywords used to bucket ChEMBL target names into cell-envelope vs other.
-# Matching is case-insensitive substring match on preferred target name.
+# Keywords used to bucket ChEMBL target / assay text into cell-envelope vs other.
+# Matching is case-insensitive substring match.
 
 cell_envelope:
+  # Peptidoglycan biosynthesis
   - penicillin-binding protein
   - penicillin binding protein
   - peptidoglycan
+  - mur ligase
   - murA
   - murB
   - murC
@@ -17,33 +19,71 @@ cell_envelope:
   - UDP-N-acetylglucosamine
   - UDP-N-acetylmuramate
   - lipid II
+  - lipid II flippase
+  - transpeptidase
+  - transglycosylase
+  - D-alanyl-D-alanine
+  - D-ala-D-ala
+  - alanine racemase
+  - FemA
+  - FemB
+  - FemX
+  - sortase
+  # Outer membrane / LPS
   - lipid A
+  - lipopolysaccharide
   - LpxA
   - LpxC
   - LpxD
   - LpxH
   - LpxK
+  - LpxL
+  - LpxM
   - BamA
+  - Bam complex
   - LptD
   - LptB
+  - LptA
+  - LptC
+  - LptE
+  - LptF
+  - LptG
   - LolC
   - LolE
   - LolD
+  - LolA
+  - LolB
   - outer membrane
+  - outer-membrane
+  - cell envelope
+  - cell-envelope
   - cell wall
-  - transpeptidase
-  - D-alanyl-D-alanine
-  - alanine racemase
-  - FemA
-  - FemB
-  - FemX
+  - cell-wall
   - WaaL
   - KdsA
   - KdsB
   - KdsC
   - KdsD
+  - MsbA
+  # Envelope-modifying / accessory (PhD-adjacent)
+  - O-acetyltransferase
+  - peptidoglycan O-acetyl
+  - O-acetylation
+  - MBOAT
+  - SGNH
+  - PatA
+  - PatB
+  - Ape1
+  - Ape2
+  - PBP1
+  - PBP2
+  - PBP3
+  - PBP4
+  - PBP5
+  - mecA
+  - mecA protein
 
-# Explicitly non-envelope (helps avoid false positives like "cell wall stress" assays)
+# Explicitly non-envelope (avoids false positives)
 exclude_from_envelope:
   - beta-lactamase
   - β-lactamase
@@ -55,6 +95,11 @@ exclude_from_envelope:
   - dihydrofolate
   - DHFR
   - folate
+  - protein synthesis
+  - aminoacyl-tRNA
+  - efflux pump
+  - TetR
+  - AcrB
 
 gram_negative_organisms:
   - Escherichia coli

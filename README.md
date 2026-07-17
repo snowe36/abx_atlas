@@ -1,74 +1,144 @@
 # abx_atlas
 
-**Antibacterial chemical-space atlas** — reproducible, leakage-aware analysis of public ChEMBL data for cell-envelope targets.
+**Antibacterial chemical-space atlas & leakage-aware QSAR** — a CPU-only, reproducible analysis of public ChEMBL data.
 
-> *A reproducible analysis of how chemical-space similarity, scaffold novelty, and dataset bias influence antibacterial QSAR performance—and whether natural products occupy underexplored regions of that space.*
+> *Can simple models predict Gram-negative antibacterial labels from structure alone—and how much of that performance is scaffold / time leakage?*
 
-## Question
+---
 
-**Can simple, leakage-aware models predict Gram-negative antibacterial activity labels from molecular structure alone, and where do they fail?**
+## Motivation
 
-Public labels are not pure molecular recognition: permeability, efflux, outer-membrane penetration, stability, and assay conditions all matter. The goal is not to claim structure alone “determines” activity, but to measure how much apparent performance survives when evaluation gets more realistic (scaffold novelty, time holdout), and to characterize the failure modes.
+My PhD focused on acyltransferases that modify the bacterial **cell envelope**—biology that sits at the interface of antibiotic mechanism and chemical space.
 
-## Hypothesis
+This repository started from that motivation, but public ChEMBL target annotations for envelope-specific MoAs are sparse at organism-level MIC scale. The **main contribution** is therefore a clear, interview-ready evaluation of antibacterial QSAR generalization:
 
-Cell-envelope / cell-wall–associated targets may occupy distinct chemical regions because they often require physicochemical properties compatible with **extracellular or periplasmic access** and with **macromolecular / lipid-facing interactions**, rather than only cytosolic binding.
+1. Characterize antibacterial chemical space (scaffolds, Gram labels, MoA buckets where available).
+2. Train simple CPU models (Morgan FP → logistic regression / random forest).
+3. Show that **random splits overstate performance** relative to scaffold and temporal holdouts.
+4. Interpret failures (bit weights, FP/FN scaffolds, nearest neighbors).
 
-The atlas and models test three related claims:
+**Talk track:** *“I know how to evaluate molecular ML properly—and I can show where optimistic chemogenomics numbers come from.”*
 
-1. **Is the chemical space different?** — Do envelope-bucket compounds separate from other MoA buckets in fingerprint / scaffold space?
-2. **Biology vs bias?** — Is any separation driven by target biology, or by dataset / assay / publication bias?
-3. **Scaffolds vs mechanisms?** — Are classifiers learning chemotypes rather than generalizable activity signals?
+---
 
-## Why this exists
+## Data source and curation
 
-My PhD focused on acyltransferases as antibiotic-relevant targets.
+| Item | Detail |
+|------|--------|
+| Source | [ChEMBL](https://www.ebi.ac.uk/chembl/) activities via `chembl-webresource-client` |
+| Organisms | Priority set: *E. coli*, *P. aeruginosa*, *K. pneumoniae*, *A. baumannii*, *S. aureus*, *S. pneumoniae*, *E. faecium*, *M. tuberculosis* |
+| Keep | Records with `pchembl_value`; types MIC / IC50 / Ki / EC50 / IZ / Potency |
+| Active | pChEMBL ≥ 5 (≈ ≤ 10 µM) |
+| Features | RDKit Morgan FP (radius 2, 2048 bits) |
+| MoA bucket | Keyword match on target name + assay description → `cell_envelope` / `other` / `unknown` |
+| NP flag | ChEMBL `natural_product` (optional; current laptop pull used `--no-np`) |
 
-This repo asks what **public bioactivity data** say about the chemistry that hits envelope-related targets, how **natural products** sit in that space (do they occupy underexplored antibacterial chemotypes?), and where **scaffold-split QSAR** still fails for Gram-negatives.
+**Current curated snapshot (priority pull, max 3000 / organism):**
 
-## What v1 ships
+- **8,793** compounds · **3,820** Bemis–Murcko scaffolds (ratio **0.43**)
+- **4,061** with Gram− labels · active rate **0.70**
+- Envelope-tagged compounds: **129** after keyword + assay-text expansion (still a minority — organism-level MIC assays rarely name molecular targets)
 
-1. **Curated tables** — compounds × antibacterial labels × MoA bucket (`cell_envelope` / `other` / `unknown`) × NP flag  
-2. **Atlas figures** — PCA of Morgan fingerprint space (MoA + NP overlays); **NP × envelope chemspace** (synthetic vs natural product with envelope highlight); Bemis–Murcko scaffold diversity; Gram+/− label balance  
-3. **QSAR baselines** — logistic regression (interpretable) and random forest for **Gram-negative antibacterial labels** (pChEMBL ≥ 5)  
-4. **Leakage analysis** — random vs scaffold vs time splits; quantify the optimistic gap  
-5. **Interpretation** — scaffold-split logreg bit weights, column-shuffle bit importance, and scaffolds enriched in false positives / false negatives  
-6. **One clear finding** — models look strong on random splits and typically degrade on novel scaffolds (classic chemogenomics hygiene)
+---
 
-```mermaid
-flowchart LR
-  chembl[ChEMBL_antibacterial] --> curate[Filter_binarize_annotate]
-  npflags[NP_flags] --> curate
-  curate --> atlas[Chemspace_atlas]
-  curate --> splits[Scaffold_vs_random_splits]
-  splits --> qsar[Sklearn_RDKit_QSAR]
-  qsar --> interpret[Bit_weights_and_error_scaffolds]
-  atlas --> readme[README_findings]
-  interpret --> readme
-  phd[Cell_envelope_PhD] -.-> readme
-```
+## Benchmark design
 
-## Scientific caveats
+**Primary task:** binary Gram-negative activity (`gram_neg_active`).
 
-This analysis does **not** claim that chemical structure alone determines antibacterial activity. Public bioactivity datasets contain substantial assay heterogeneity, target annotation bias, and publication bias. Labels conflate on-target potency with permeability, efflux, and experimental conditions. Morgan-bit weights indicate associative patterns, not causal substructures. The goal is to quantify how much apparent predictive performance survives increasingly realistic evaluation settings—and to make those failure modes visible.
+**Models (intentionally simple):**
 
-## Quickstart (CPU only)
+- Logistic regression (interpretable coefficients)
+- Random forest
+
+**Splits (the point of the repo):**
+
+| Split | What it tests |
+|-------|----------------|
+| Random (stratified) | Optimistic upper bound / leakage-prone |
+| Scaffold (Bemis–Murcko) | Generalization to novel chemotypes |
+| Time (earliest document year) | Prospective / publication-era shift |
+
+**Interpretation:** top ± Morgan-bit logreg weights, column-shuffle importance, FP/FN scaffold enrichment, nearest-train-neighbor Tanimoto for TP/FP/FN.
+
+No deep learning in v1 — the story is evaluation hygiene, not architecture hunting.
+
+---
+
+## Results
+
+### Chemical space (Figures 1–2)
+
+Antibacterial compounds occupy **broad** Morgan-FP space with substantial scaffold diversity (~43% unique scaffolds). Most scaffolds are rare — exactly the setting where random splits leak.
+
+### Leakage-aware QSAR (Figure 3 — hero)
+
+| Split | LogReg ROC-AUC | RF ROC-AUC |
+|-------|---------------:|-----------:|
+| Random | **0.78** | **0.86** |
+| Scaffold | **0.70** | **0.83** |
+| Time | **0.51** | **0.59** |
+
+Mean optimistic gap (random − scaffold): **~0.06**. Temporal holdout nearly collapses linear performance to chance.
+
+### Learning curve (Figure 4)
+
+On held-out scaffolds, RF improves with more train data then **plateaus** (Δ ≈ +0.06 from 10%→100% train); logreg does **not** improve monotonically. More ChEMBL rows alone do not erase chemotype / era bias.
+
+### What the model is learning (Figure 5 + tables)
+
+- False positives are often **structurally close** to actives in the training set (high Tanimoto to nearest neighbor) yet sit on **novel scaffolds** at test time.
+- Logreg bit weights and permutation importance highlight associative fingerprint patterns — not causal substructures.
+
+**Takeaway:** apparent Gram− QSAR strength is partly **chemotype memorization** and **dataset era**. Scaffold- and time-aware evaluation makes that visible.
+
+---
+
+## Limitations
+
+- Organism-level assays dominate; molecular MoA labels (esp. cell-envelope) are incomplete.
+- Labels conflate potency with permeability, efflux, stability, and assay conditions.
+- NP annotations were skipped in the laptop pull (`--no-np`); NP panels may be empty until re-fetched.
+- Keyword MoA bucketing is heuristic; β-lactamases are explicitly excluded from the envelope bucket.
+- Morgan bits indicate association, not mechanism.
+
+---
+
+## Reproducibility
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e .
+pip install -e ".[dev]"
 bash scripts/reproduce.sh
+# or:
+abx-download --max-per-organism 5000   # add NP flags by omitting --no-np
+abx-atlas
+abx-qsar
+pytest -q
 ```
 
-Or step-by-step:
+| Artifact | Path |
+|----------|------|
+| Fig 1 chemspace | `reports/figures/fig1_chemspace_atlas.png` |
+| Fig 2 scaffolds | `reports/figures/fig2_scaffold_diversity.png` |
+| Fig 3 leakage (hero) | `reports/figures/fig3_leakage_rocauc.png` |
+| Fig 4 learning curve | `reports/figures/fig4_learning_curve.png` |
+| Fig 5 neighbors | `reports/figures/fig5_error_neighbors.png` |
+| Metrics | `data/processed/qsar_leakage_results.csv`, `atlas_summary.csv` |
 
-```bash
-abx-download --max-per-organism 5000   # ChEMBL API; capped for laptop runs
-abx-atlas                              # figures → reports/figures/
-abx-qsar                               # leakage + interpretation → data/processed/
-```
+CPU only. MIT license. Cite ChEMBL when using regenerated tables ([CITATION.cff](CITATION.cff)).
 
-Set `MAX_PER_ORG=0` (via `abx-download --max-per-organism 0`) for uncapped pulls.
+---
+
+## Future directions
+
+- Integrate **COCONUT** / NPAtlas natural-product annotations
+- Improve **mechanism-level labeling** (target family / UniProt / GO), not only name keywords
+- Prospective **external validation** sets beyond ChEMBL time splits
+- Stronger classical baselines (e.g. gradient boosting) once leakage story is fixed
+- Bit→substructure highlighting for the strongest FP/FN motifs
+- Optional later: graph / pretrained molecular embeddings — **after** evaluation is solid
+
+---
 
 ## Layout
 
@@ -78,39 +148,12 @@ abx_atlas/
   pyproject.toml
   src/abxatlas/
     data/          # ChEMBL fetch + cleaning + MoA/NP annotation
-    featurize/     # Morgan FP, descriptors, Bemis–Murcko scaffolds
+    featurize/     # Morgan FP, Bemis–Murcko scaffolds
     atlas/         # chemspace stats + figures
-    models/        # sklearn pipelines, splitters, interpretation
-    resources/     # envelope-target keywords, Gram organism lists
+    models/        # splits, QSAR, learning curves, interpretation
+    resources/     # envelope keywords, Gram organism lists
   scripts/reproduce.sh
   reports/figures/
+  tests/
   LICENSE
 ```
-
-## Methods (short)
-
-| Piece | Choice |
-|-------|--------|
-| Source | ChEMBL activities with pChEMBL for priority Gram+/− pathogens |
-| Active | pChEMBL ≥ 5 (≈ ≤ 10 µM) |
-| Envelope bucket | Keyword match on target preferred name (Mur ligases, PBPs, LpxC, BamA/LptD, …); β-lactamases excluded |
-| Features | Morgan FP (r=2, 2048 bits) via RDKit |
-| Splits | Stratified random; Bemis–Murcko scaffold; earliest document-year holdout when available |
-| Models | Logistic regression (baseline + coefficients); Random Forest |
-| Interpretation | Top ± Morgan-bit logreg weights; column-shuffle importance on top |coef| bits; FP/FN scaffold enrichment on scaffold-split test |
-
-Natural-product flags come from ChEMBL molecule annotations (optional COCONUT overlap can be layered later).
-
-## Key outputs
-
-| Artifact | Path |
-|----------|------|
-| NP × envelope PCA | `reports/figures/pca_np_vs_envelope.png` |
-| Leakage ROC-AUC | `reports/figures/qsar_leakage_rocauc.png` |
-| Logreg bit weights | `reports/figures/qsar_logreg_bit_weights.png` + `data/processed/qsar_logreg_bit_weights.csv` |
-| Error scaffolds | `reports/figures/qsar_error_scaffolds.png` + `data/processed/qsar_error_scaffolds.csv` |
-
-## Roadmap
-
-- Optional later: LightGBM / graph models once baselines and leakage story are solid
-- Bit-to-substructure highlighting (RDKit `GetOnBits` examples) for the strongest FP/FN motifs

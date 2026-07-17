@@ -6,6 +6,8 @@ import json
 import logging
 
 from abxatlas.atlas.plots import (
+    plot_fig1_chemspace_atlas,
+    plot_fig2_scaffold_diversity,
     plot_gram_label_balance,
     plot_np_envelope_chemspace,
     plot_np_vs_synthetic_moa,
@@ -27,27 +29,28 @@ def run_atlas() -> dict:
     summary.to_csv(summary_path, index=False)
 
     figures = []
-    for color_by in ("moa_bucket", "is_natural_product"):
+    # Primary portfolio figures
+    for fn in (plot_fig1_chemspace_atlas, plot_fig2_scaffold_diversity):
+        try:
+            figures.append(str(fn(compounds)))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("%s failed: %s", fn.__name__, exc)
+
+    for color_by in ("moa_bucket", "is_natural_product", "gram_neg_active"):
         try:
             figures.append(str(plot_pca_chemspace(compounds, color_by=color_by)))
         except Exception as exc:  # noqa: BLE001
             logger.warning("PCA plot (%s) failed: %s", color_by, exc)
-    try:
-        figures.append(str(plot_np_envelope_chemspace(compounds)))
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("NP×envelope PCA plot failed: %s", exc)
-    try:
-        figures.append(str(plot_scaffold_counts(compounds)))
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Scaffold plot failed: %s", exc)
-    try:
-        figures.append(str(plot_np_vs_synthetic_moa(compounds)))
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("NP plot failed: %s", exc)
-    try:
-        figures.append(str(plot_gram_label_balance(compounds)))
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Gram balance plot failed: %s", exc)
+    for fn in (
+        plot_np_envelope_chemspace,
+        plot_scaffold_counts,
+        plot_np_vs_synthetic_moa,
+        plot_gram_label_balance,
+    ):
+        try:
+            figures.append(str(fn(compounds)))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("%s failed: %s", fn.__name__, exc)
 
     meta = {
         "n_compounds": int(len(compounds)),
