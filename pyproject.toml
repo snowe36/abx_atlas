@@ -25,7 +25,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4"]
+dev = ["pytest>=7.4", "ruff>=0.6"]
+gpu = [
+  "torch>=2.2",
+  "torch_geometric>=2.5",
+  "transformers>=4.40",
+  "optuna>=3.5",
+  "python-dotenv>=1.0",
+  "runpod>=1.6",
+]
 
 [project.scripts]
 abx-download = "abxatlas.cli:download_main"
@@ -37,3 +45,15 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 abxatlas = ["resources/*.yaml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", "data", "reports", "notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["abxatlas"]

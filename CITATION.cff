@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software or the regenerated tables/figures, please cite
+  this repository and the underlying ChEMBL data source below.
+title: "abx_atlas: A leakage-aware atlas of antibacterial chemical space"
+type: software
+authors:
+  - family-names: Snow
+    given-names: Eric
+license: MIT
+repository-code: "https://github.com/snowe36/abx_atlas"
+abstract: >-
+  A reproducible atlas of antibacterial chemical space built from public
+  ChEMBL bioactivity data, with a leakage-aware benchmark (random vs.
+  scaffold vs. temporal splits) for Gram-negative activity QSAR, plus
+  optional GPU deep-learning models (GNN, fine-tuned chemical transformer)
+  evaluated on the same splits.
+keywords:
+  - cheminformatics
+  - antibacterial
+  - QSAR
+  - machine learning
+  - ChEMBL
+  - drug discovery
+  - scaffold splitting
+  - graph neural network
+preferred-citation:
+  type: generic
+  title: "ChEMBL"
+  authors:
+    - name: "EMBL-EBI"
+  url: "https://www.ebi.ac.uk/chembl/"
+  notes: >-
+    Cite ChEMBL directly when redistributing or publishing results derived
+    from the bioactivity data curated by this repository. See
+    https://www.ebi.ac.uk/chembl/ for the current recommended citation.
