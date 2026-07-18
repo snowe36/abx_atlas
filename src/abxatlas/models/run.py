@@ -22,7 +22,7 @@ from abxatlas.models.splits import (
     scaffold_split_indices,
     time_split_indices,
 )
-from abxatlas.paths import FIGURES, PROCESSED, as_repo_path, ensure_dirs
+from abxatlas.paths import FIGURES, PROCESSED, ROOT, as_repo_path, ensure_dirs
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,7 @@ def run_qsar(
         "primary_task": "gram_neg_active (pChEMBL >= 5)",
         "interpretation": _relativize_meta(interpret_meta),
         "learning_curve": _relativize_meta(curve_meta),
-        "deep_models": deep_meta,
+        "deep_models": _relativize_meta(deep_meta),
     }
     (PROCESSED / "qsar_meta.json").write_text(json.dumps(meta, indent=2))
     print(results_df.to_string(index=False))
@@ -382,18 +382,25 @@ def _relativize_meta(obj):
         return {k: _relativize_meta(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [_relativize_meta(v) for v in obj]
-    if isinstance(obj, str) and ("/" in obj or "\\" in obj):
-        # Heuristic: only rewrite paths that look like file paths we wrote
-        lower = obj.lower()
-        if any(
-            key in lower
-            for key in ("data/", "reports/", "abx_atlas/", "/workspace/", ".csv", ".png", ".json")
-        ):
-            try:
-                return as_repo_path(obj)
-            except Exception:  # noqa: BLE001
-                return obj
-    return obj
+    if not isinstance(obj, str):
+        return obj
+    s = obj.replace("\\", "/")
+    # Strip known absolute prefixes from local and RunPod layouts
+    for prefix in (
+        str(ROOT).replace("\\", "/") + "/",
+        "/workspace/abx_atlas/",
+        "/workspace/",
+    ):
+        if s.startswith(prefix):
+            s = s[len(prefix) :]
+            break
+    else:
+        # Existing file under the repo → relative path
+        try:
+            return as_repo_path(obj)
+        except Exception:  # noqa: BLE001
+            return obj
+    return s
 
 
 def _plot_leakage(results: pd.DataFrame) -> None:

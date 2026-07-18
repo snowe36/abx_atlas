@@ -83,7 +83,7 @@
         },
         "best_value": 0.8398011587246287,
         "n_trials": 20,
-        "trials_csv": "/workspace/abx_atlas/data/processed/gnn_hpo_trials.csv"
+        "trials_csv": "data/processed/gnn_hpo_trials.csv"
       },
       "n_graphs": 5572
     },
@@ -103,7 +103,7 @@
         },
         "best_value": 0.8369204763932439,
         "n_trials": 6,
-        "trials_csv": "/workspace/abx_atlas/data/processed/pretrained_hpo_trials.csv"
+        "trials_csv": "data/processed/pretrained_hpo_trials.csv"
       },
       "model_name_hf": "seyonec/ChemBERTa-zinc-base-v1"
     }
