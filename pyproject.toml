@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abx-atlas"
-version = "0.1.0"
-description = "Leakage-aware atlas of antibacterial chemical space for cell-envelope targets (ChEMBL, CPU-only)"
+version = "0.2.0"
+description = "Leakage-aware antibacterial QSAR benchmark on public ChEMBL data (CPU baselines + optional GPU ablation)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.base import clone
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
@@ -28,8 +29,9 @@ class SplitResult:
 
 
 def make_models(random_state: int = 42) -> dict[str, object]:
-    # Sparse Morgan bits: prefer interpretable linear baseline + RF.
-    # Boosted trees on 2048 binary bits are deferred until leakage baselines are solid.
+    # Interpretable linear baseline + tree ensembles on Morgan bits.
+    # HistGradientBoosting is the stronger classical control once leakage
+    # splits are in place (see README future→done for GBDT).
     return {
         "logreg": Pipeline(
             [
@@ -52,6 +54,15 @@ def make_models(random_state: int = 42) -> dict[str, object]:
             n_jobs=-1,
             random_state=random_state,
         ),
+        "gbdt": HistGradientBoostingClassifier(
+            max_depth=6,
+            learning_rate=0.08,
+            max_iter=250,
+            min_samples_leaf=10,
+            l2_regularization=1.0,
+            class_weight="balanced",
+            random_state=random_state,
+        ),
     }
 
 
@@ -62,8 +73,9 @@ def evaluate_split(
     test_idx: np.ndarray,
     split_name: str,
     models: dict[str, object] | None = None,
+    random_state: int = 42,
 ) -> list[SplitResult]:
-    models = models or make_models()
+    models = models or make_models(random_state)
     X_train, X_test = X[train_idx], X[test_idx]
     y_train, y_test = y[train_idx], y[test_idx]
     results = []
@@ -71,9 +83,7 @@ def evaluate_split(
         return results
 
     for name, model in models.items():
-        clf = model
-        # Fresh clone-ish: re-instantiate from factory for safety
-        clf = make_models()[name]
+        clf = clone(model)
         clf.fit(X_train, y_train)
         if hasattr(clf, "predict_proba"):
             proba = clf.predict_proba(X_test)[:, 1]

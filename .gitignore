@@ -4,6 +4,12 @@ data/processed/*
 !data/.gitkeep
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+# Small reviewable metrics snapshots (README links; regenerate with pipeline)
+!data/processed/atlas_summary.csv
+!data/processed/qsar_leakage_results.csv
+!data/processed/qsar_meta.json
+!data/processed/qsar_learning_curve.csv
+!data/processed/qsar_bit_substructures.csv
 
 # Keep committed figures so README embeds render on GitHub
 # (pipeline regenerates them; commit when they change)
@@ -24,6 +30,7 @@ venv/
 .mypy_cache/
 .ruff_cache/
 *.parquet
+!tests/fixtures/**/*.parquet
 .DS_Store
 .ipynb_checkpoints/
 *.log

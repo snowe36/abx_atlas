@@ -4,6 +4,7 @@ message: >-
   this repository and the underlying ChEMBL data source below.
 title: "abx_atlas: A leakage-aware atlas of antibacterial chemical space"
 type: software
+version: "0.2.0"
 authors:
   - family-names: Snow
     given-names: Eric

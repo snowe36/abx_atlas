@@ -1,0 +1,11 @@
+metric,value
+n_compounds,38699.0
+n_scaffolds,20128.0
+scaffold_ratio,0.52
+n_natural_products,361.0
+frac_natural_products,0.009
+moa_other,28647.0
+moa_unknown,9698.0
+moa_cell_envelope,354.0
+n_with_gram_neg_label,5572.0
+gram_neg_active_rate,0.726

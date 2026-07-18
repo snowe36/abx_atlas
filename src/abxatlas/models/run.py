@@ -22,7 +22,7 @@ from abxatlas.models.splits import (
     scaffold_split_indices,
     time_split_indices,
 )
-from abxatlas.paths import FIGURES, PROCESSED, ensure_dirs
+from abxatlas.paths import FIGURES, PROCESSED, as_repo_path, ensure_dirs
 
 logger = logging.getLogger(__name__)
 
@@ -68,14 +68,21 @@ def run_qsar(
         if tsplit is not None:
             splits["time"] = tsplit
 
+    # Keep prior deep-model rows/meta when this run is CPU-only (or partial GPU).
+    prev_deep_rows, prev_deep_meta = _load_prior_deep_results(
+        preserve_gnn=not with_gnn, preserve_pretrained=not with_pretrained
+    )
+
     all_results: list[SplitResult] = []
     models = make_models(RANDOM_STATE)
     for split_name, (tr, te) in splits.items():
         all_results.extend(
-            evaluate_split(X, y, tr, te, split_name=split_name, models=models)
+            evaluate_split(
+                X, y, tr, te, split_name=split_name, models=models, random_state=RANDOM_STATE
+            )
         )
 
-    deep_meta: dict = {}
+    deep_meta: dict = dict(prev_deep_meta)
     if with_gnn:
         try:
             deep_meta["gnn"] = _run_gnn_models(
@@ -103,6 +110,8 @@ def run_qsar(
             deep_meta["pretrained"] = {"error": str(exc)}
 
     results_df = pd.DataFrame([r.__dict__ for r in all_results])
+    if not prev_deep_rows.empty:
+        results_df = pd.concat([results_df, prev_deep_rows], ignore_index=True)
     out_csv = PROCESSED / "qsar_leakage_results.csv"
     results_df.to_csv(out_csv, index=False)
 
@@ -119,11 +128,11 @@ def run_qsar(
     meta = {
         "n_compounds": int(len(df)),
         "active_rate": float(y.mean()),
-        "results_csv": str(out_csv),
+        "results_csv": as_repo_path(out_csv),
         "optimistic_gap_roc_auc": gap,
         "primary_task": "gram_neg_active (pChEMBL >= 5)",
-        "interpretation": interpret_meta,
-        "learning_curve": curve_meta,
+        "interpretation": _relativize_meta(interpret_meta),
+        "learning_curve": _relativize_meta(curve_meta),
         "deep_models": deep_meta,
     }
     (PROCESSED / "qsar_meta.json").write_text(json.dumps(meta, indent=2))
@@ -325,6 +334,68 @@ def _optimistic_gap(results: pd.DataFrame) -> dict:
     }
 
 
+def _load_prior_deep_results(
+    preserve_gnn: bool,
+    preserve_pretrained: bool,
+) -> tuple[pd.DataFrame, dict]:
+    """Reuse prior GNN/ChemBERTa metrics when this invocation does not retrain them."""
+    keep_models: list[str] = []
+    if preserve_gnn:
+        keep_models.append("gnn")
+    if preserve_pretrained:
+        keep_models.append("chemberta")
+    if not keep_models:
+        return pd.DataFrame(), {}
+
+    rows = pd.DataFrame()
+    csv_path = PROCESSED / "qsar_leakage_results.csv"
+    if csv_path.exists():
+        prev = pd.read_csv(csv_path)
+        if "model_name" in prev.columns:
+            rows = prev[prev["model_name"].isin(keep_models)].copy()
+
+    deep_meta: dict = {}
+    meta_path = PROCESSED / "qsar_meta.json"
+    if meta_path.exists():
+        try:
+            prev_meta = json.loads(meta_path.read_text())
+            old_deep = prev_meta.get("deep_models") or {}
+            if preserve_gnn and "gnn" in old_deep:
+                deep_meta["gnn"] = old_deep["gnn"]
+            if preserve_pretrained and "pretrained" in old_deep:
+                deep_meta["pretrained"] = old_deep["pretrained"]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not load prior deep_models meta: %s", exc)
+
+    if not rows.empty:
+        logger.info(
+            "Preserving %d prior deep-model result rows (%s)",
+            len(rows),
+            ", ".join(keep_models),
+        )
+    return rows, deep_meta
+
+
+def _relativize_meta(obj):
+    """Rewrite absolute filesystem paths in nested meta to repo-relative strings."""
+    if isinstance(obj, dict):
+        return {k: _relativize_meta(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_relativize_meta(v) for v in obj]
+    if isinstance(obj, str) and ("/" in obj or "\\" in obj):
+        # Heuristic: only rewrite paths that look like file paths we wrote
+        lower = obj.lower()
+        if any(
+            key in lower
+            for key in ("data/", "reports/", "abx_atlas/", "/workspace/", ".csv", ".png", ".json")
+        ):
+            try:
+                return as_repo_path(obj)
+            except Exception:  # noqa: BLE001
+                return obj
+    return obj
+
+
 def _plot_leakage(results: pd.DataFrame) -> None:
     """Figure 3 (hero): random vs scaffold vs time ROC-AUC."""
     if results.empty:
@@ -332,11 +403,22 @@ def _plot_leakage(results: pd.DataFrame) -> None:
     split_order = [
         s for s in ["random", "scaffold", "time"] if s in results["split_name"].unique()
     ]
-    models = sorted(results["model_name"].unique())
+    # Stable legend order: CPU baselines first, then deep models
+    preferred = ["logreg", "rf", "gbdt", "gnn", "chemberta"]
+    present = list(results["model_name"].unique())
+    models = [m for m in preferred if m in present] + sorted(
+        m for m in present if m not in preferred
+    )
     fig, ax = plt.subplots(figsize=(7.5 + 0.6 * max(0, len(models) - 2), 4.8))
     x = np.arange(len(split_order))
     width = 0.8 / max(len(models), 1)
-    base_colors = {"logreg": "#1b4f72", "rf": "#b9770e", "gnn": "#1e8449", "chemberta": "#6c3483"}
+    base_colors = {
+        "logreg": "#1b4f72",
+        "rf": "#b9770e",
+        "gbdt": "#117a65",
+        "gnn": "#1e8449",
+        "chemberta": "#6c3483",
+    }
     palette = plt.get_cmap("tab10")
     colors = {m: base_colors.get(m, palette(i % 10)) for i, m in enumerate(models)}
     for i, model in enumerate(models):
@@ -355,7 +437,7 @@ def _plot_leakage(results: pd.DataFrame) -> None:
                     f"{v:.2f}",
                     ha="center",
                     va="bottom",
-                    fontsize=9,
+                    fontsize=8 if len(models) > 4 else 9,
                 )
     ax.set_xticks(x + width * (len(models) - 1) / 2)
     ax.set_xticklabels(split_order)
@@ -363,7 +445,7 @@ def _plot_leakage(results: pd.DataFrame) -> None:
     ax.set_ylim(0.4, 1.05)
     ax.set_title("Figure 3. Leakage-aware Gram-negative QSAR (hero result)")
     ax.axhline(0.5, color="#999999", lw=0.8, ls="--")
-    ax.legend(frameon=False)
+    ax.legend(frameon=False, ncol=2 if len(models) > 4 else 1)
     fig.tight_layout()
     for name in ("qsar_leakage_rocauc.png", "fig3_leakage_rocauc.png"):
         out = FIGURES / name

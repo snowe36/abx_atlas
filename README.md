@@ -25,11 +25,11 @@ This is an evaluation-hygiene / leakage-diagnostic problem with explicit negativ
 1. **Download & curate** ChEMBL antibacterial activities across a full Gram+/− organism panel
 2. **Map** antibacterial chemical space (Morgan FP atlas, Bemis–Murcko scaffolds, MoA / NP panels)
 3. **Benchmark** Gram-negative activity prediction under random, scaffold, and time splits
-4. **Interpret** failures (bit weights, FP/FN scaffolds, nearest-train-neighbor Tanimoto)
+4. **Interpret** failures (bit weights → substructures, FP/FN scaffolds, nearest-train-neighbor Tanimoto)
 5. **Ablate** against optional GPU deep models (from-scratch GNN + fine-tuned ChemBERTa) on the *same* splits — same protocol, honest comparison
 
 <p align="center">
-  <img src="reports/figures/fig3_leakage_rocauc.png" alt="Leakage-aware QSAR: ROC-AUC across random, scaffold, and time splits for logreg, RF, GNN, and ChemBERTa" width="720"/>
+  <img src="reports/figures/fig3_leakage_rocauc.png" alt="Leakage-aware QSAR: ROC-AUC across random, scaffold, and time splits for logreg, RF, GBDT, GNN, and ChemBERTa" width="720"/>
 </p>
 
 <p align="center"><em>Figure 3 (hero). Every model looks strong on a random split. Re-split by chemical scaffold or by publication year and the story changes — that gap <strong>is</strong> the finding.</em></p>
@@ -44,8 +44,9 @@ This is an evaluation-hygiene / leakage-diagnostic problem with explicit negativ
 | Gram− labeled compounds (primary task) | **5,572** · active rate **0.73** |
 | Random-split RF ROC-AUC (optimistic) | **0.87** |
 | Scaffold-split RF ROC-AUC | **0.84** |
-| Time-split RF ROC-AUC | **0.56** |
-| Mean optimistic gap (random − scaffold, 4 models) | **~0.04** |
+| Scaffold-split GBDT ROC-AUC | **0.82** (stronger than logreg; still trails RF) |
+| Time-split RF / GBDT ROC-AUC | **~0.55** / **0.54** |
+| Mean optimistic gap (random − scaffold, 5 models) | **~0.04** |
 | Does a from-scratch GNN erase the leakage story? | **No** (scaffold 0.79; still trails RF) |
 | Does fine-tuned ChemBERTa erase it? | **No** on scaffold (0.79); **strongest on time** (0.60) |
 | Does more ChEMBL data fix scaffold generalization? | **Plateaus** (RF Δ ≈ +0.11 from 10%→100% train) |
@@ -121,7 +122,7 @@ Full summary: [`data/processed/atlas_summary.csv`](data/processed/atlas_summary.
 
 **Primary task:** binary Gram-negative activity (`gram_neg_active`).
 
-**CPU baselines** (always on): logistic regression + random forest on Morgan fingerprints.
+**CPU baselines** (always on): logistic regression, random forest, and histogram gradient boosting (GBDT) on Morgan fingerprints.
 
 **Splits (the point of the repo):**
 
@@ -133,19 +134,19 @@ Full summary: [`data/processed/atlas_summary.csv`](data/processed/atlas_summary.
 
 CPU + GPU models on the expanded Gram− task (n=5,572). Deep models trained on RunPod (RTX A4000) with Optuna HPO (20 GNN trials, 6 ChemBERTa trials):
 
-| Split | LogReg ROC-AUC | RF ROC-AUC | GNN ROC-AUC | ChemBERTa ROC-AUC |
-|-------|---------------:|-----------:|------------:|-------------------:|
-| Random | **0.78** | **0.87** | **0.83** | **0.82** |
-| Scaffold | **0.73** | **0.84** | **0.79** | **0.79** |
-| Time | **0.43** | **0.56** | **0.48** | **0.60** |
+| Split | LogReg | RF | GBDT | GNN | ChemBERTa |
+|-------|-------:|---:|-----:|----:|----------:|
+| Random | **0.78** | **0.87** | **0.84** | **0.83** | **0.82** |
+| Scaffold | **0.73** | **0.84** | **0.82** | **0.79** | **0.79** |
+| Time | **0.44** | **0.55** | **0.54** | **0.48** | **0.60** |
 
 <p align="center">
-  <img src="reports/figures/fig3_leakage_rocauc.png" alt="ROC-AUC by split for logreg, RF, GNN, and ChemBERTa" width="720"/>
+  <img src="reports/figures/fig3_leakage_rocauc.png" alt="ROC-AUC by split for logreg, RF, GBDT, GNN, and ChemBERTa" width="720"/>
 </p>
 
-<p align="center"><em>Figure 3. Leakage-aware Gram-negative QSAR — RF leads on random/scaffold; ChemBERTa is strongest on the temporal holdout; none erase the drop.</em></p>
+<p align="center"><em>Figure 3. Leakage-aware Gram-negative QSAR — RF leads on random/scaffold; GBDT sits between RF and logreg; ChemBERTa is strongest on the temporal holdout; none erase the drop.</em></p>
 
-Mean optimistic gap (random − scaffold, all four models): **~0.04**. Neither the from-scratch GNN nor fine-tuned ChemBERTa erases the leakage story — RF still leads on random/scaffold, while ChemBERTa is the strongest on the temporal holdout.
+Mean optimistic gap (random − scaffold, all five models): **~0.04**. A stronger classical baseline (GBDT) and both deep models leave the leakage story intact — RF still leads on random/scaffold, while ChemBERTa is the strongest on the temporal holdout.
 
 Full metrics: [`data/processed/qsar_leakage_results.csv`](data/processed/qsar_leakage_results.csv) · HPO configs: [`data/processed/qsar_meta.json`](data/processed/qsar_meta.json).
 
@@ -165,12 +166,19 @@ Interpretation on the scaffold-split logreg:
 
 - False positives are often **structurally close** to actives in the training set (high Tanimoto to nearest neighbor) yet sit on **novel scaffolds** at test time
 - Logreg bit weights and permutation importance highlight associative fingerprint patterns — not causal substructures
+- Top bits are mapped back to **example Morgan environments** (fragment SMILES + RDKit bit highlights) so the coefficients are inspectable, not just IDs
 
 <p align="center">
   <img src="reports/figures/fig5_error_neighbors.png" alt="Nearest-train-neighbor Tanimoto and label agreement for TP, FP, and FN" width="720"/>
 </p>
 
 <p align="center"><em>Figure 5. What are TP / FP / FN near in chemical space? Correct calls sit closer to same-label train neighbors; errors do not.</em></p>
+
+<p align="center">
+  <img src="reports/figures/fig6_morgan_bit_substructures.png" alt="Top Morgan bits mapped to example substructure highlights" width="720"/>
+</p>
+
+<p align="center"><em>Figure 6. Top ± Morgan bits → example substructures (associative motifs, not mechanisms).</em></p>
 
 <p align="center">
   <img src="reports/figures/qsar_logreg_bit_weights.png" alt="Top positive and negative Morgan-bit logistic regression coefficients" width="640"/>
@@ -184,7 +192,7 @@ Interpretation on the scaffold-split logreg:
 
 <p align="center"><em>Scaffolds enriched in FP / FN on the scaffold-split test — model blind spots by chemotype.</em></p>
 
-**Takeaway:** apparent Gram− QSAR strength is partly **chemotype memorization** and **dataset era**. Scaffold- and time-aware evaluation makes that visible — and the GPU models shift the absolute numbers without changing that core finding.
+**Takeaway:** apparent Gram− QSAR strength is partly **chemotype memorization** and **dataset era**. Scaffold- and time-aware evaluation makes that visible — and neither a stronger classical baseline (GBDT) nor the GPU models change that core finding.
 
 ---
 
@@ -263,10 +271,10 @@ Cite ChEMBL when using regenerated tables ([CITATION.cff](CITATION.cff)).
 - Integrate **COCONUT** / NPAtlas natural-product annotations
 - Improve **mechanism-level labeling** (target family / UniProt / GO), not only name keywords
 - Prospective **external validation** sets beyond ChEMBL time splits
-- Stronger classical baselines (e.g. gradient boosting) once the leakage story is fixed
-- Bit→substructure highlighting for the strongest FP/FN motifs
-- Attribution/explainability for the GNN (e.g. GNNExplainer) to extend the Figure 5 failure-analysis story
+- Attribution/explainability for the GNN (e.g. GNNExplainer) to extend the Figure 5–6 failure-analysis story
 - Larger HPO budgets and a multi-task head (Gram− + Gram+ + MoA bucket jointly)
+
+Done in v0.2: GBDT classical baseline · Morgan bit→substructure highlighting · committed metrics snapshots · fixture-based CI pipeline smoke test.
 
 ---
 
@@ -304,7 +312,9 @@ pip install -e ".[gpu]" → python scripts/runpod/launch_gpu_job.py
 | Fig 3 leakage (hero) | `reports/figures/fig3_leakage_rocauc.png` |
 | Fig 4 learning curve | `reports/figures/fig4_learning_curve.png` |
 | Fig 5 neighbors | `reports/figures/fig5_error_neighbors.png` |
-| Metrics | `data/processed/qsar_leakage_results.csv`, `atlas_summary.csv` |
+| Fig 6 bit→substructure | `reports/figures/fig6_morgan_bit_substructures.png` |
+| Metrics (committed) | `data/processed/qsar_leakage_results.csv`, `atlas_summary.csv`, `qsar_meta.json` |
+| Bit fragments | `data/processed/qsar_bit_substructures.csv` |
 
 ---
 
@@ -313,11 +323,17 @@ pip install -e ".[gpu]" → python scripts/runpod/launch_gpu_job.py
 ```text
 src/abxatlas/        package (data, featurize, atlas, models, resources)
 scripts/             reproduce.sh + runpod/ (GPU orchestrator + pod bootstrap)
-data/raw|processed/  ChEMBL download + curated tables / metrics
+data/raw|processed/  ChEMBL download + curated tables / committed metrics snapshots
 reports/figures/     atlas + leakage + interpretation figures
-tests/               unit tests (21 passing)
+tests/               unit + fixture pipeline smoke tests
 .github/workflows/   CI (ruff + pytest)
 ```
+
+---
+
+## Acknowledgments
+
+Bioactivity data from [ChEMBL](https://www.ebi.ac.uk/chembl/) (EMBL-EBI). Cite ChEMBL when redistributing regenerated tables — see [CITATION.cff](CITATION.cff).
 
 ---
 

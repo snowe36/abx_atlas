@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 import logging
+from io import BytesIO
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from PIL import Image
+from rdkit import Chem
+from rdkit.Chem import AllChem, Draw
 from sklearn.pipeline import Pipeline
 
+from abxatlas.config import MORGAN_NBITS, MORGAN_RADIUS
 from abxatlas.featurize.scaffolds import scaffold_series
 from abxatlas.paths import FIGURES, PROCESSED, ensure_dirs
 
 logger = logging.getLogger(__name__)
-
 
 def extract_logreg_weights(model: Pipeline) -> pd.DataFrame:
     """Return Morgan-bit coefficients from a fitted logreg pipeline."""
@@ -174,6 +178,150 @@ def plot_logreg_weights(
     fig.tight_layout()
     out = out_path or (FIGURES / "qsar_logreg_bit_weights.png")
     fig.savefig(out, dpi=180)
+    plt.close(fig)
+    logger.info("Wrote %s", out)
+    return out
+
+
+def _fragment_smiles_for_bit(
+    mol,
+    atom_idx: int,
+    radius: int,
+) -> str | None:
+    """Return a SMILES for the Morgan environment centered on atom_idx."""
+    try:
+        env = Chem.FindAtomEnvironmentOfRadiusN(mol, radius, int(atom_idx))
+        atoms = {int(atom_idx)}
+        for bond_idx in env:
+            bond = mol.GetBondWithIdx(bond_idx)
+            atoms.add(bond.GetBeginAtomIdx())
+            atoms.add(bond.GetEndAtomIdx())
+        frag = Chem.PathToSubmol(mol, env) if env else None
+        if frag is None:
+            # radius-0: single atom
+            return mol.GetAtomWithIdx(int(atom_idx)).GetSymbol()
+        return Chem.MolToSmiles(frag, canonical=True)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def explain_morgan_bits(
+    smiles: list[str] | pd.Series,
+    bit_indices: list[int] | np.ndarray,
+    weights: pd.DataFrame | None = None,
+    radius: int = MORGAN_RADIUS,
+    n_bits: int = MORGAN_NBITS,
+    examples_per_bit: int = 1,
+) -> pd.DataFrame:
+    """Map Morgan bit IDs to example substructure fragments from molecules that set them."""
+    weight_map = {}
+    if weights is not None and not weights.empty:
+        weight_map = dict(zip(weights["bit"].astype(int), weights["weight"], strict=False))
+
+    rows = []
+    smiles_list = list(smiles)
+    for bit in [int(b) for b in bit_indices]:
+        found = 0
+        for smi in smiles_list:
+            mol = Chem.MolFromSmiles(smi) if isinstance(smi, str) else None
+            if mol is None:
+                continue
+            bit_info: dict = {}
+            AllChem.GetMorganFingerprintAsBitVect(
+                mol, radius, nBits=n_bits, bitInfo=bit_info
+            )
+            if bit not in bit_info:
+                continue
+            atom_idx, env_radius = bit_info[bit][0]
+            frag = _fragment_smiles_for_bit(mol, atom_idx, env_radius)
+            rows.append(
+                {
+                    "bit": bit,
+                    "weight": float(weight_map.get(bit, np.nan)),
+                    "example_smiles": smi,
+                    "center_atom": int(atom_idx),
+                    "env_radius": int(env_radius),
+                    "fragment_smiles": frag,
+                }
+            )
+            found += 1
+            if found >= examples_per_bit:
+                break
+        if found == 0:
+            rows.append(
+                {
+                    "bit": bit,
+                    "weight": float(weight_map.get(bit, np.nan)),
+                    "example_smiles": None,
+                    "center_atom": None,
+                    "env_radius": None,
+                    "fragment_smiles": None,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def plot_morgan_bit_highlights(
+    explanations: pd.DataFrame,
+    out_path: Path | None = None,
+    max_bits: int = 8,
+) -> Path | None:
+    """Draw RDKit Morgan-bit highlights for the strongest explained bits."""
+    ensure_dirs()
+    if explanations.empty:
+        return None
+    panel = explanations.dropna(subset=["example_smiles"]).copy()
+    if panel.empty:
+        return None
+    if panel["weight"].notna().any():
+        panel = panel.assign(abs_weight=lambda d: d["weight"].abs()).sort_values(
+            "abs_weight", ascending=False
+        )
+    panel = panel.drop_duplicates(subset=["bit"]).head(max_bits)
+    if panel.empty:
+        return None
+
+    images = []
+    labels = []
+    for _, row in panel.iterrows():
+        mol = Chem.MolFromSmiles(str(row["example_smiles"]))
+        if mol is None:
+            continue
+        bit_info: dict = {}
+        AllChem.GetMorganFingerprintAsBitVect(
+            mol, MORGAN_RADIUS, nBits=MORGAN_NBITS, bitInfo=bit_info
+        )
+        bit = int(row["bit"])
+        if bit not in bit_info:
+            continue
+        try:
+            raw = Draw.DrawMorganBit(mol, bit, bit_info, useSVG=False)
+            img = Image.open(BytesIO(raw)) if isinstance(raw, bytes | bytearray) else raw
+        except Exception:  # noqa: BLE001
+            img = Draw.MolToImage(mol, size=(250, 200))
+        images.append(img)
+        w = row["weight"]
+        frag = row.get("fragment_smiles") or "?"
+        labels.append(f"bit {bit}: {frag}" + (f" (w={w:+.2f})" if pd.notna(w) else ""))
+
+    if not images:
+        return None
+
+    n = len(images)
+    ncols = min(4, n)
+    nrows = int(np.ceil(n / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(3.2 * ncols, 3.0 * nrows))
+    axes_arr = np.atleast_1d(axes).ravel()
+    for ax in axes_arr:
+        ax.axis("off")
+    for ax, img, label in zip(axes_arr, images, labels, strict=False):
+        ax.imshow(img)
+        ax.set_title(label, fontsize=8)
+        ax.axis("off")
+    fig.suptitle("Figure 6. Top Morgan bits → example substructures", y=1.02, fontsize=11)
+    fig.tight_layout()
+    out = out_path or (FIGURES / "fig6_morgan_bit_substructures.png")
+    fig.savefig(out, dpi=180, bbox_inches="tight")
     plt.close(fig)
     logger.info("Wrote %s", out)
     return out
@@ -353,13 +501,33 @@ def run_interpretation(
         except Exception as exc:  # noqa: BLE001
             logger.warning("Nearest-neighbor analysis failed: %s", exc)
 
-    figures = [str(p) for p in (fig_weights, fig_errors, fig_neighbors) if p is not None]
+    bit_explain_path = None
+    fig_bits = None
+    try:
+        top_pos = weights.nlargest(4, "weight")["bit"].tolist()
+        top_neg = weights.nsmallest(4, "weight")["bit"].tolist()
+        explain_bits = top_pos + top_neg
+        # Prefer train molecules (bit was learned there); fall back to test
+        pool = list(smiles_train) if smiles_train is not None else list(smiles_test)
+        bit_explain = explain_morgan_bits(pool, explain_bits, weights=weights)
+        bit_explain_path = PROCESSED / "qsar_bit_substructures.csv"
+        bit_explain.to_csv(bit_explain_path, index=False)
+        fig_bits = plot_morgan_bit_highlights(bit_explain)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Bit→substructure mapping failed: %s", exc)
+
+    figures = [
+        str(p)
+        for p in (fig_weights, fig_errors, fig_neighbors, fig_bits)
+        if p is not None
+    ]
     return {
         "error_counts": err_counts,
         "weights_csv": str(weights_path),
         "error_scaffolds_csv": str(enrich_path),
         "neighbors_csv": str(neighbor_path) if neighbor_path else None,
         "permutation_csv": str(perm_path) if perm_path else None,
+        "bit_substructures_csv": str(bit_explain_path) if bit_explain_path else None,
         "figures": figures,
         "n_test": int(len(y_test)),
         "top_positive_bits": weights.nlargest(10, "weight")["bit"].tolist(),

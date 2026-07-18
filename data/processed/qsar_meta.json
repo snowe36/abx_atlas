@@ -1,0 +1,111 @@
+{
+  "n_compounds": 5572,
+  "active_rate": 0.7259511844938981,
+  "results_csv": "data/processed/qsar_leakage_results.csv",
+  "optimistic_gap_roc_auc": {
+    "per_model": {
+      "chemberta": 0.024399226934961882,
+      "gbdt": 0.023965512259619404,
+      "gnn": 0.04214643152439079,
+      "logreg": 0.054296505038170184,
+      "rf": 0.03142315058200662
+    },
+    "mean_gap_roc_auc": 0.035246165267829775
+  },
+  "primary_task": "gram_neg_active (pChEMBL >= 5)",
+  "interpretation": {
+    "error_counts": {
+      "TP": 569,
+      "FP": 151,
+      "FN": 181,
+      "TN": 214
+    },
+    "weights_csv": "data/processed/qsar_logreg_bit_weights.csv",
+    "error_scaffolds_csv": "data/processed/qsar_error_scaffolds.csv",
+    "neighbors_csv": "data/processed/qsar_error_neighbors.csv",
+    "permutation_csv": "data/processed/qsar_bit_permutation_importance.csv",
+    "bit_substructures_csv": "data/processed/qsar_bit_substructures.csv",
+    "figures": [
+      "reports/figures/qsar_logreg_bit_weights.png",
+      "reports/figures/qsar_error_scaffolds.png",
+      "reports/figures/fig5_error_neighbors.png",
+      "reports/figures/fig6_morgan_bit_substructures.png"
+    ],
+    "n_test": 1115,
+    "top_positive_bits": [
+      1866,
+      1004,
+      1459,
+      1471,
+      1791,
+      119,
+      1375,
+      1031,
+      1978,
+      1910
+    ],
+    "top_negative_bits": [
+      1937,
+      1963,
+      140,
+      157,
+      1836,
+      473,
+      1267,
+      521,
+      200,
+      1023
+    ]
+  },
+  "learning_curve": {
+    "csv": "data/processed/qsar_learning_curve.csv",
+    "figure": "reports/figures/fig4_learning_curve.png",
+    "plateau_hint": "logreg: \u0394=+0.072 overall, last step +0.022; rf: \u0394=+0.107 overall, last step +0.013"
+  },
+  "deep_models": {
+    "gnn": {
+      "config": {
+        "hidden_dim": 128,
+        "num_layers": 4,
+        "dropout": 0.19729091562705764,
+        "conv_type": "gin",
+        "lr": 0.00021294796715500987,
+        "weight_decay": 3.2719190019699956e-05
+      },
+      "hpo": {
+        "best_params": {
+          "hidden_dim": 128,
+          "num_layers": 4,
+          "dropout": 0.19729091562705764,
+          "conv_type": "gin",
+          "lr": 0.00021294796715500987,
+          "weight_decay": 3.2719190019699956e-05
+        },
+        "best_value": 0.8398011587246287,
+        "n_trials": 20,
+        "trials_csv": "/workspace/abx_atlas/data/processed/gnn_hpo_trials.csv"
+      },
+      "n_graphs": 5572
+    },
+    "pretrained": {
+      "config": {
+        "lr": 0.00010401663679887307,
+        "epochs": 2,
+        "dropout": 0.04679835610086079,
+        "max_length": 128,
+        "batch_size": 32
+      },
+      "hpo": {
+        "best_params": {
+          "lr": 0.00010401663679887307,
+          "epochs": 2,
+          "dropout": 0.04679835610086079
+        },
+        "best_value": 0.8369204763932439,
+        "n_trials": 6,
+        "trials_csv": "/workspace/abx_atlas/data/processed/pretrained_hpo_trials.csv"
+      },
+      "model_name_hf": "seyonec/ChemBERTa-zinc-base-v1"
+    }
+  }
+}

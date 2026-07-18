@@ -1,0 +1,9 @@
+bit,weight,example_smiles,center_atom,env_radius,fragment_smiles
+1866,1.1212167414341376,C(=C/c1cc2ccc(C3=NCCN3)cc2[nH]1)\c1cc2ccc(C3=NCCN3)cc2[nH]1.Cl,12,1,CNC
+1004,0.8914576617727412,CN[C@H](CC(C)C)C(=O)N[C@H]1C(=O)N[C@@H](CC(N)=O)C(=O)N[C@H]2C(=O)N[C@H]3C(=O)N[C@H](C(=O)N[C@H](C(=O)O)c4cc(O)cc(O)c4-c4cc3ccc4O)[C@H](O)c3ccc(c(Cl)c3)Oc3cc2cc(c3O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O[C@H]2C[C@](C)(N)[C@H](O)[C@H](C)O2)Oc2ccc(cc2Cl)[C@H]1O,15,1,CCC
+1459,0.8677798736874812,Nc1nc(N)c2c(ccc3c2ccn3Cc2cccc3scnc23)n1,3,1,cc(n)N
+1471,0.840608449417914,CC1=CC(=O)c2c(O)cccc2C1=O,6,2,ccc(O)c(c)C
+1937,-0.8994806447286132,CC(=O)N[C@H](C(=O)N[C@H]1Cn2cc(nn2)C[C@@H](C(=O)N[C@@H](Cc2c[nH]c3ccccc23)C(N)=O)NC(=O)[C@H](CC(C)C)NC(=O)[C@H](CCC(=O)O)NC(=O)[C@H](CO)NC1=O)C(C)C,24,2,cc[nH]c(c)c
+1963,-0.8685381014324857,O=[N+]([O-])c1ccc(C2=NN(c3ccccc3)C(c3ccco3)C2)cc1,1,0,N
+140,-0.8263388795383166,CC(=O)N[C@H](C(=O)N[C@H]1Cn2cc(nn2)C[C@@H](C(=O)N[C@@H](Cc2c[nH]c3ccccc23)C(N)=O)NC(=O)[C@H](CC(C)C)NC(=O)[C@H](CCC(=O)O)NC(=O)[C@H](CO)NC1=O)C(C)C,32,1,CN
+157,-0.821173986259614,Cc1cc(=O)c(O)c(CNC(=O)CC2CCCCC2)n1C,19,2,cc(C)n(C)c(c)C

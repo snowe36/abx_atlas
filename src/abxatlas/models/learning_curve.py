@@ -8,6 +8,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.base import clone
 from sklearn.metrics import roc_auc_score
 
 from abxatlas.config import RANDOM_STATE
@@ -35,6 +36,11 @@ def scaffold_learning_curve(
     if len(np.unique(y_test)) < 2:
         return pd.DataFrame()
 
+    # Keep the learning-curve figure focused on the original CPU pair;
+    # GBDT is evaluated in the leakage table separately.
+    models = {
+        k: v for k, v in make_models(random_state).items() if k in ("logreg", "rf")
+    }
     rows = []
     for frac in fractions:
         n = max(20, int(round(len(tr) * frac)))
@@ -43,8 +49,8 @@ def scaffold_learning_curve(
         chosen = _stratified_subsample(tr, y[tr], n, rng)
         if len(np.unique(y[chosen])) < 2:
             continue
-        for name, _factory in make_models(random_state).items():
-            clf = make_models(random_state)[name]
+        for name, model in models.items():
+            clf = clone(model)
             clf.fit(X[chosen], y[chosen])
             proba = clf.predict_proba(X_test)[:, 1]
             rows.append(
