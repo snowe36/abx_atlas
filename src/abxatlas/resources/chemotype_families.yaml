@@ -29,9 +29,8 @@ families:
     require_smarts:
       - "c1ccc(Oc2ccccc2)cc1"
     min_amide_count: 5
-    reference_smiles: "C[C@H]1O[C@H](O[C@H]2[C@H](O[C@@H]3O[C@@H](C)[C@H](O)[C@@H]([C@H]3O)N)[C@@H](O)[C@H](O)[C@@H](CO)O2)C[C@](C)(N)[C@H]1O"
-    # Fallback: Tanimoto to vancomycin core; full vanco SMILES is brittle across RDKit versions
-    similarity_reference_smiles: "CC(C)C[C@@H]1NC(=O)[C@H](CC(=O)N)NC(=O)[C@@H](NC(=O)c2cc(O)c(O)c(c2)Oc3ccc(cc3)C[C@H](NC)C(=O)N)c4ccc(O)c(c4)c5c(O)cc(O)cc5"
+    reference_smiles: "C[C@H](O)[C@@H]1NC(=O)[C@H](CC(=O)N)NC(=O)[C@H](CC(=O)N)NC(=O)[C@@H](NC(=O)[C@@H](CC(C)C)NC)[C@H](O)c2ccc(Oc3cc4cc(Oc5ccc(cc5Cl)[C@@H](O)[C@@H]6NC(=O)[C@H](NC(=O)[C@@H]4NC(=O)[C@H](CC(=O)N)NC6=O)c6ccc(O)c(c6)c3O)c(Cl)c2)c(O)c1"
+    reference_name: vancomycin
     similarity_threshold: 0.35
     case_study: true
 

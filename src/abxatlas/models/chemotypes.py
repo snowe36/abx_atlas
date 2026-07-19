@@ -278,17 +278,20 @@ def surprise_case_study(
     y: np.ndarray,
     X: np.ndarray,
     splits: dict[str, tuple[np.ndarray, np.ndarray]],
-    model,
+    models_by_split: dict[str, object],
     case_family_ids: tuple[str, ...] = ("fluoroquinolone", "glycopeptide", "polymyxin"),
     families: list[dict] | None = None,
 ) -> pd.DataFrame:
-    """Per historic family: train support, split membership, errors, OOD distance."""
+    """Per historic family: train support, split membership, errors, OOD distance.
+
+    `models_by_split` maps split name → classifier already fit on that split's train fold.
+    """
     fams, _ = _prepare_families(families)
     label_map = {f["id"]: f.get("label", f["id"]) for f in fams}
     assigned = assign_chemotype_families(smiles, families=families)
     # Multi-label membership for case-study families (not only primary)
     membership = {
-        fid: assigned["families"].fillna("").str.contains(rf"(?:^|\\|){fid}(?:\\||$)", regex=True)
+        fid: assigned["families"].fillna("").str.contains(rf"(?:^|\|){fid}(?:\||$)", regex=True)
         | (assigned["primary_family"] == fid)
         for fid in case_family_ids
     }
@@ -299,6 +302,7 @@ def surprise_case_study(
         idxs = np.flatnonzero(mask)
         n_total = int(len(idxs))
         for split_name, (tr, te) in splits.items():
+            model = models_by_split.get(split_name)
             tr_set, te_set = set(map(int, tr)), set(map(int, te))
             in_train = np.array([i in tr_set for i in idxs], dtype=bool)
             in_test = np.array([i in te_set for i in idxs], dtype=bool)
@@ -308,7 +312,7 @@ def surprise_case_study(
             y_pred_test = np.array([], dtype=int)
             err_test = np.array([], dtype=object)
             nn_tani = np.array([], dtype=float)
-            if len(test_idx) > 0:
+            if len(test_idx) > 0 and model is not None:
                 _, y_pred_test = predict_binary(model, X[test_idx])
                 err_test = error_labels(y[test_idx], y_pred_test)
                 nn_tani = _nearest_train_tanimoto(X[tr], X[test_idx])
@@ -318,6 +322,7 @@ def surprise_case_study(
             fn = int((err_test == "FN").sum()) if n_te else 0
             tp = int((err_test == "TP").sum()) if n_te else 0
             tn = int((err_test == "TN").sum()) if n_te else 0
+            mean_nn = float(np.nanmean(nn_tani)) if n_te and len(nn_tani) else float("nan")
             rows.append(
                 {
                     "family": fid,
@@ -334,7 +339,7 @@ def surprise_case_study(
                     "TN": tn,
                     "accuracy": ((tp + tn) / n_te) if n_te else float("nan"),
                     "error_rate": ((fp + fn) / n_te) if n_te else float("nan"),
-                    "mean_nn_tanimoto": float(np.nanmean(nn_tani)) if n_te else float("nan"),
+                    "mean_nn_tanimoto": mean_nn,
                     "ood_hint": (
                         "scarce_in_task"
                         if n_total < 10
@@ -343,7 +348,7 @@ def surprise_case_study(
                             if n_te > 0 and len(train_idx) == 0
                             else (
                                 "structurally_remote"
-                                if n_te > 0 and float(np.nanmean(nn_tani)) < 0.35
+                                if n_te > 0 and np.isfinite(mean_nn) and mean_nn < 0.35
                                 else "supported"
                             )
                         )
@@ -458,37 +463,46 @@ def plot_surprise_case_study(
 
 
 def run_chemotype_interpretation(
-    model,
     X: np.ndarray,
     y: np.ndarray,
     smiles: list[str] | pd.Series,
     splits: dict[str, tuple[np.ndarray, np.ndarray]],
+    model_factory,
 ) -> dict:
-    """Enrichment on scaffold + time splits, plus three-family surprise case study."""
+    """Enrichment on scaffold + time splits, plus three-family surprise case study.
+
+    `model_factory` is a zero-arg callable returning a fresh unfitted classifier
+    (typically `lambda: clone(make_models(...)["logreg"])`).
+    """
     ensure_dirs()
     enrich_frames = []
     figures: list[str] = []
+    models_by_split: dict[str, object] = {}
+    smiles_list = list(smiles)
 
-    for split_name in ("scaffold", "time"):
+    for split_name in ("scaffold", "time", "random"):
         if split_name not in splits:
             continue
         tr, te = splits[split_name]
-        if len(np.unique(y[te])) < 1:
+        if len(np.unique(y[tr])) < 2 or len(te) == 0:
             continue
-        # Fit-free: caller passes a model already fit on the relevant train split
-        # For multi-split enrichment we re-fit logreg per split inside the runner.
-        _, y_pred = predict_binary(model, X[te])
-        enrich = chemotype_error_enrichment(
-            pd.Series(list(smiles)).iloc[te],
-            y[te],
-            y_pred,
-            split_name=split_name,
-        )
-        if not enrich.empty:
-            enrich_frames.append(enrich)
-            fig = plot_chemotype_enrichment(enrich, split_name=split_name)
-            if fig is not None:
-                figures.append(str(fig))
+        model = model_factory()
+        model.fit(X[tr], y[tr])
+        models_by_split[split_name] = model
+
+        if split_name in ("scaffold", "time"):
+            _, y_pred = predict_binary(model, X[te])
+            enrich = chemotype_error_enrichment(
+                [smiles_list[i] for i in te],
+                y[te],
+                y_pred,
+                split_name=split_name,
+            )
+            if not enrich.empty:
+                enrich_frames.append(enrich)
+                fig = plot_chemotype_enrichment(enrich, split_name=split_name)
+                if fig is not None:
+                    figures.append(str(fig))
 
     enrich_df = pd.concat(enrich_frames, ignore_index=True) if enrich_frames else pd.DataFrame()
     enrich_path = PROCESSED / "qsar_chemotype_enrichment.csv"
@@ -497,14 +511,13 @@ def run_chemotype_interpretation(
     else:
         enrich_path = None
 
-    case_df = surprise_case_study(smiles, y, X, splits, model)
+    case_df = surprise_case_study(smiles_list, y, X, splits, models_by_split)
     case_path = PROCESSED / "qsar_surprise_case_study.csv"
     case_df.to_csv(case_path, index=False)
     fig_case = plot_surprise_case_study(case_df)
     if fig_case is not None:
         figures.append(str(fig_case))
 
-    # Narrative bullets for meta / README hooks
     narrative = _build_narrative(enrich_df, case_df)
 
     return {
