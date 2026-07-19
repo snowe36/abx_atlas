@@ -1,24 +1,8 @@
 #!/usr/bin/env python3
-"""Orchestrate a GPU training run on RunPod: create a pod, sync code+data up,
-run bootstrap.sh (GNN + pretrained transformer training/HPO), pull results
-back into this repo, then stop the pod.
+"""Create a RunPod GPU pod, sync code+data, run bootstrap.sh, pull results, stop the pod.
 
-Usage:
-    python scripts/runpod/launch_gpu_job.py [options]
-
-Prerequisites:
-    - pip install -e ".[gpu]"   (for the `runpod` SDK locally)
-    - a RunPod API key in .env as RUNPOD_API_KEY (or the existing API_KEY)
-    - an SSH public key added to your RunPod account (Settings > SSH Keys)
-      so the pod accepts your local private key automatically
-
-Safety: every pod gets a self-terminating watchdog baked into bootstrap.sh
-that fires after --max-runtime-hours (default 4h) regardless of what this
-script does — robust to a hung job or a dropped connection. On normal
-completion this script also stops the pod immediately (the watchdog is just
-the backstop). Pass --keep-alive to leave the pod up for interactive SSH use
-(the watchdog still applies), or --terminate to delete it outright instead of
-just stopping it.
+Prereqs: pip install -e ".[gpu]", RUNPOD_API_KEY in .env, SSH key on the RunPod account.
+Pods self-terminate after --max-runtime-hours (default 4h). See --help for flags.
 """
 
 from __future__ import annotations

@@ -36,7 +36,6 @@ def scaffold_split_indices(
     Greedy assignment of largest scaffolds first toward the target test fraction.
     """
     scaffolds = scaffold_series(list(smiles))
-    # Map scaffold -> indices
     scaf_to_idx: dict[str, list[int]] = defaultdict(list)
     for i, scaf in enumerate(scaffolds):
         key = scaf if scaf is not None else f"__none_{i}"

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "abx-atlas"
 version = "0.3.0"
-description = "An antibacterial chemical-space atlas revealing why QSAR fails under scaffold and temporal shift"
+description = "Leakage-aware antibacterial QSAR benchmark on ChEMBL (scaffold and time splits)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -18,7 +18,6 @@ dependencies = [
   "chembl-webresource-client>=0.10.9",
   "requests>=2.31",
   "matplotlib>=3.7",
-  "seaborn>=0.13",
   "pyarrow>=14.0",
   "tqdm>=4.66",
   "PyYAML>=6.0",

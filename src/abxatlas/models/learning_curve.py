@@ -36,8 +36,6 @@ def scaffold_learning_curve(
     if len(np.unique(y_test)) < 2:
         return pd.DataFrame()
 
-    # Keep the learning-curve figure focused on the original CPU pair;
-    # GBDT is evaluated in the leakage table separately.
     models = {
         k: v for k, v in make_models(random_state).items() if k in ("logreg", "rf")
     }

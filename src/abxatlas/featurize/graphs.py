@@ -1,8 +1,4 @@
-"""RDKit molecule -> PyTorch Geometric graph featurization for GNN models.
-
-Kept separate from fingerprints.py since it has an optional heavy dependency
-(torch / torch_geometric) that plain CPU installs of this repo don't need.
-"""
+"""RDKit → PyG graphs (optional torch deps)."""
 
 from __future__ import annotations
 

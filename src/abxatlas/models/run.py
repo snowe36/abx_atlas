@@ -165,8 +165,7 @@ def _run_gnn_models(
     gnn_hpo_trials: int,
     all_results: list[SplitResult],
 ) -> dict:
-    """Featurize once, optionally HPO-tune, then evaluate the GNN on every
-    outer split — appending SplitResult rows into `all_results` in place."""
+    """Evaluate GNN on all splits; appends SplitResult rows to all_results."""
     try:
         import torch  # noqa: F401
         import torch_geometric  # noqa: F401
@@ -243,8 +242,7 @@ def _run_pretrained_models(
     pretrained_hpo_trials: int,
     all_results: list[SplitResult],
 ) -> dict:
-    """Fine-tune (with optional HPO) and evaluate the pretrained transformer
-    on every outer split — appending SplitResult rows into `all_results`."""
+    """Evaluate ChemBERTa on all splits; appends SplitResult rows to all_results."""
     try:
         import torch  # noqa: F401
         import transformers  # noqa: F401
@@ -329,7 +327,6 @@ def _run_chemotype_layer(
     y: np.ndarray,
     splits: dict[str, tuple[np.ndarray, np.ndarray]],
 ) -> dict:
-    """Named chemotype enrichment + historic-scaffold surprise case study."""
     try:
         return run_chemotype_interpretation(
             X,
@@ -344,7 +341,7 @@ def _run_chemotype_layer(
 
 
 def _print_chemotype_narrative(chemotype_meta: dict) -> None:
-    narr = (chemotype_meta or {}).get("narrative") or {}
+    narr = chemotype_meta.get("narrative") or {}
     temporal = narr.get("temporal_failures") or []
     if temporal:
         bits = [
@@ -356,7 +353,7 @@ def _print_chemotype_narrative(chemotype_meta: dict) -> None:
         bits = [
             f"{c['family']} n={c['n_total']} ({c.get('ood_hint') or '?'})" for c in cases
         ]
-        print("Surprise case study: " + "; ".join(bits))
+        print("Case study: " + "; ".join(bits))
 
 
 def _optimistic_gap(results: pd.DataFrame) -> dict:

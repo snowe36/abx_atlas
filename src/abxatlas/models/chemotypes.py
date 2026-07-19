@@ -1,4 +1,4 @@
-"""Named chemotype families, temporal failure enrichment, and surprise case studies."""
+"""Named chemotype families, failure enrichment, and historic-scaffold case studies."""
 
 from __future__ import annotations
 
@@ -42,14 +42,13 @@ def _compile_smarts(smarts_list: list[str] | None) -> list:
     return pats
 
 
-def _morgan_fp(mol) -> object | None:
+def _morgan_fp(mol):
     if mol is None:
         return None
     return AllChem.GetMorganFingerprintAsBitVect(mol, MORGAN_RADIUS, nBits=MORGAN_NBITS)
 
 
 def _family_match(mol, family: dict, ref_fps: dict[str, object]) -> bool:
-    """Return True if mol belongs to this family (SMARTS / heuristics / similarity)."""
     if mol is None:
         return False
 
@@ -58,42 +57,29 @@ def _family_match(mol, family: dict, ref_fps: dict[str, object]) -> bool:
     min_mw = family.get("min_mw")
     min_amide = family.get("min_amide_count")
     sim_thr = family.get("similarity_threshold")
-    fid = family["id"]
+    uses_heuristics = bool(require_pats or min_mw is not None or min_amide is not None)
 
-    mw = Descriptors.MolWt(mol) if (min_mw is not None or min_amide is not None) else None
-    n_amide = (
-        len(mol.GetSubstructMatches(AMIDE_SMARTS))
-        if (min_amide is not None or require_pats)
-        else None
-    )
-
-    # Structural heuristic path (glycopeptide / polymyxin-style)
-    if require_pats or min_mw is not None or min_amide is not None:
-        ok = True
-        if min_mw is not None and (mw is None or mw < float(min_mw)):
-            ok = False
-        if min_amide is not None and (n_amide is None or n_amide < int(min_amide)):
-            ok = False
+    if uses_heuristics:
+        if min_mw is not None and Descriptors.MolWt(mol) < float(min_mw):
+            return False
+        if min_amide is not None and len(mol.GetSubstructMatches(AMIDE_SMARTS)) < int(min_amide):
+            return False
         if require_pats and not all(mol.HasSubstructMatch(p) for p in require_pats):
-            ok = False
+            return False
         if smarts_pats and not any(mol.HasSubstructMatch(p) for p in smarts_pats):
-            # When SMARTS are listed alongside heuristics, require at least one SMARTS hit
-            ok = False
-        if ok and (require_pats or min_mw is not None):
+            return False
+        if require_pats or min_mw is not None:
             return True
 
-    # Pure SMARTS families
-    if smarts_pats and not (require_pats or min_mw is not None or min_amide is not None):
+    if smarts_pats and not uses_heuristics:
         if any(mol.HasSubstructMatch(p) for p in smarts_pats):
             return True
 
-    # Similarity fallback to a reference drug
+    fid = family["id"]
     if sim_thr is not None and fid in ref_fps:
         fp = _morgan_fp(mol)
-        if fp is not None:
-            tan = DataStructs.TanimotoSimilarity(fp, ref_fps[fid])
-            if tan >= float(sim_thr):
-                return True
+        if fp is not None and DataStructs.TanimotoSimilarity(fp, ref_fps[fid]) >= float(sim_thr):
+            return True
 
     return False
 
@@ -105,10 +91,9 @@ def _prepare_families(families: list[dict] | None = None) -> tuple[list[dict], d
         fam = dict(raw)
         fam["_smarts_pats"] = _compile_smarts(fam.get("smarts"))
         fam["_require_pats"] = _compile_smarts(fam.get("require_smarts"))
-        ref_smi = fam.get("similarity_reference_smiles") or fam.get("reference_smiles")
+        ref_smi = fam.get("reference_smiles")
         if ref_smi:
-            ref_mol = Chem.MolFromSmiles(ref_smi)
-            fp = _morgan_fp(ref_mol)
+            fp = _morgan_fp(Chem.MolFromSmiles(ref_smi))
             if fp is not None:
                 ref_fps[fam["id"]] = fp
         fams.append(fam)
@@ -119,11 +104,7 @@ def assign_chemotype_families(
     smiles: list[str] | pd.Series,
     families: list[dict] | None = None,
 ) -> pd.DataFrame:
-    """Assign primary + multi-label chemotype families to each SMILES.
-
-    Returns one row per input molecule with columns:
-      smiles, primary_family, primary_label, families (pipe-joined ids)
-    """
+    """Assign primary + multi-label chemotype families to each SMILES."""
     fams, ref_fps = _prepare_families(families)
     rows = []
     for smi in list(smiles):
@@ -157,8 +138,6 @@ def chemotype_error_enrichment(
     frame["y_pred"] = np.asarray(y_pred).astype(int)
     frame["error"] = err
     frame["is_error"] = frame["error"].isin(["FP", "FN"])
-    frame["is_fn"] = frame["error"] == "FN"
-    frame["is_fp"] = frame["error"] == "FP"
 
     overall_err = float(frame["is_error"].mean()) if len(frame) else 0.0
     rows = []
@@ -172,7 +151,6 @@ def chemotype_error_enrichment(
         tn = int((g["error"] == "TN").sum())
         err_n = fp + fn
         err_rate = err_n / n
-        # Fisher exact: family×error vs rest
         rest = frame[frame["primary_family"] != fam_id]
         table = [
             [err_n, n - err_n],
@@ -182,12 +160,11 @@ def chemotype_error_enrichment(
             odds, pval = fisher_exact(table, alternative="greater")
         except ValueError:
             odds, pval = float("nan"), float("nan")
-        label = g["primary_label"].iloc[0]
         rows.append(
             {
                 "split_name": split_name,
                 "family": fam_id,
-                "label": label,
+                "label": g["primary_label"].iloc[0],
                 "n": n,
                 "TP": tp,
                 "FP": fp,
@@ -220,16 +197,14 @@ def plot_chemotype_enrichment(
 ) -> Path | None:
     """Horizontal bars: error lift by named chemotype family."""
     ensure_dirs()
-    if enrichment is None or enrichment.empty:
+    if enrichment.empty:
         return None
-    sub = enrichment[enrichment["split_name"] == split_name].copy()
+    sub = enrichment[
+        (enrichment["split_name"] == split_name) & (enrichment["family"] != "other")
+    ].head(top_n)
     if sub.empty:
         return None
-    # Prefer named families over "other"
-    sub = sub[sub["family"] != "other"]
-    if sub.empty:
-        return None
-    top = sub.head(top_n).iloc[::-1]
+    top = sub.iloc[::-1]
     fig, ax = plt.subplots(figsize=(8.2, 4.8))
     colors = ["#922b21" if r > 1.15 else "#1b4f72" for r in top["error_lift"]]
     ax.barh(top["label"], top["error_lift"], color=colors)
@@ -260,11 +235,7 @@ def plot_chemotype_enrichment(
     return out
 
 
-def _nearest_train_tanimoto(
-    X_train: np.ndarray,
-    X_query: np.ndarray,
-) -> np.ndarray:
-    """Max Tanimoto of each query row to the training fingerprint matrix."""
+def _nearest_train_tanimoto(X_train: np.ndarray, X_query: np.ndarray) -> np.ndarray:
     from sklearn.metrics import pairwise_distances
 
     if len(X_train) == 0 or len(X_query) == 0:
@@ -273,41 +244,49 @@ def _nearest_train_tanimoto(
     return 1.0 - dist.min(axis=1)
 
 
+def _ood_hint(n_total: int, n_train: int, n_te: int, mean_nn: float) -> str:
+    if n_total < 10:
+        return "scarce_in_task"
+    if n_te > 0 and n_train == 0:
+        return "held_out_chemotype"
+    if n_te > 0 and np.isfinite(mean_nn) and mean_nn < 0.35:
+        return "structurally_remote"
+    return "supported"
+
+
+def _case_family_ids(families: list[dict] | None = None) -> tuple[str, ...]:
+    fams = families or load_chemotype_families()
+    ids = tuple(f["id"] for f in fams if f.get("case_study"))
+    return ids or ("fluoroquinolone", "glycopeptide", "polymyxin")
+
+
 def surprise_case_study(
     smiles: list[str] | pd.Series,
     y: np.ndarray,
     X: np.ndarray,
     splits: dict[str, tuple[np.ndarray, np.ndarray]],
     models_by_split: dict[str, object],
-    case_family_ids: tuple[str, ...] = ("fluoroquinolone", "glycopeptide", "polymyxin"),
+    case_family_ids: tuple[str, ...] | None = None,
     families: list[dict] | None = None,
 ) -> pd.DataFrame:
-    """Per historic family: train support, split membership, errors, OOD distance.
-
-    `models_by_split` maps split name → classifier already fit on that split's train fold.
-    """
+    """Per historic family: train support, split membership, errors, NN distance."""
     fams, _ = _prepare_families(families)
     label_map = {f["id"]: f.get("label", f["id"]) for f in fams}
+    case_ids = case_family_ids or _case_family_ids(families)
     assigned = assign_chemotype_families(smiles, families=families)
-    # Multi-label membership for case-study families (not only primary)
-    membership = {
-        fid: assigned["families"].fillna("").str.contains(rf"(?:^|\|){fid}(?:\||$)", regex=True)
-        | (assigned["primary_family"] == fid)
-        for fid in case_family_ids
-    }
 
     rows = []
-    for fid in case_family_ids:
-        mask = membership[fid].to_numpy()
-        idxs = np.flatnonzero(mask)
+    for fid in case_ids:
+        mask = assigned["families"].fillna("").str.contains(
+            rf"(?:^|\|){fid}(?:\||$)", regex=True
+        ) | (assigned["primary_family"] == fid)
+        idxs = np.flatnonzero(mask.to_numpy())
         n_total = int(len(idxs))
         for split_name, (tr, te) in splits.items():
             model = models_by_split.get(split_name)
             tr_set, te_set = set(map(int, tr)), set(map(int, te))
-            in_train = np.array([i in tr_set for i in idxs], dtype=bool)
-            in_test = np.array([i in te_set for i in idxs], dtype=bool)
-            train_idx = idxs[in_train]
-            test_idx = idxs[in_test]
+            train_idx = np.array([i for i in idxs if i in tr_set], dtype=int)
+            test_idx = np.array([i for i in idxs if i in te_set], dtype=int)
 
             y_pred_test = np.array([], dtype=int)
             err_test = np.array([], dtype=object)
@@ -340,31 +319,26 @@ def surprise_case_study(
                     "accuracy": ((tp + tn) / n_te) if n_te else float("nan"),
                     "error_rate": ((fp + fn) / n_te) if n_te else float("nan"),
                     "mean_nn_tanimoto": mean_nn,
-                    "ood_hint": (
-                        "scarce_in_task"
-                        if n_total < 10
-                        else (
-                            "held_out_chemotype"
-                            if n_te > 0 and len(train_idx) == 0
-                            else (
-                                "structurally_remote"
-                                if n_te > 0 and np.isfinite(mean_nn) and mean_nn < 0.35
-                                else "supported"
-                            )
-                        )
-                    ),
+                    "ood_hint": _ood_hint(n_total, len(train_idx), n_te, mean_nn),
                 }
             )
     return pd.DataFrame(rows)
+
+
+def _split_val(sub: pd.DataFrame, split: str, col: str, default=np.nan):
+    hit = sub.loc[sub["split_name"] == split, col]
+    if hit.empty or pd.isna(hit.iloc[0]):
+        return default
+    return hit.iloc[0]
 
 
 def plot_surprise_case_study(
     case_df: pd.DataFrame,
     out_path: Path | None = None,
 ) -> Path | None:
-    """Figure 8: three historic families × split — support, errors, OOD distance."""
+    """Three historic families × split: support, errors, NN Tanimoto."""
     ensure_dirs()
-    if case_df is None or case_df.empty:
+    if case_df.empty:
         return None
 
     families = list(dict.fromkeys(case_df["label"].tolist()))
@@ -378,34 +352,10 @@ def plot_surprise_case_study(
     for ax, fam_label in zip(axes, families, strict=False):
         sub = case_df[case_df["label"] == fam_label]
         xs = np.arange(len(split_order))
-        n_test = [
-            int(sub.loc[sub["split_name"] == s, "n_test"].iloc[0])
-            if s in set(sub["split_name"])
-            else 0
-            for s in split_order
-        ]
-        err = [
-            float(sub.loc[sub["split_name"] == s, "error_rate"].iloc[0])
-            if s in set(sub["split_name"]) and pd.notna(
-                sub.loc[sub["split_name"] == s, "error_rate"].iloc[0]
-            )
-            else 0.0
-            for s in split_order
-        ]
-        nn = [
-            float(sub.loc[sub["split_name"] == s, "mean_nn_tanimoto"].iloc[0])
-            if s in set(sub["split_name"]) and pd.notna(
-                sub.loc[sub["split_name"] == s, "mean_nn_tanimoto"].iloc[0]
-            )
-            else 0.0
-            for s in split_order
-        ]
-        n_train = [
-            int(sub.loc[sub["split_name"] == s, "n_train"].iloc[0])
-            if s in set(sub["split_name"])
-            else 0
-            for s in split_order
-        ]
+        n_test = [int(_split_val(sub, s, "n_test", 0)) for s in split_order]
+        err = [float(_split_val(sub, s, "error_rate", 0.0)) for s in split_order]
+        nn = [float(_split_val(sub, s, "mean_nn_tanimoto", 0.0)) for s in split_order]
+        n_train = [int(_split_val(sub, s, "n_train", 0)) for s in split_order]
         n_total = int(sub["n_total"].iloc[0]) if len(sub) else 0
 
         width = 0.35
@@ -450,7 +400,7 @@ def plot_surprise_case_study(
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 1.05))
     fig.suptitle(
-        "Figure 8. Surprise case study — three historic scaffolds under leakage-aware splits",
+        "Figure 8. Three historic scaffolds under leakage-aware splits",
         y=1.12,
         fontsize=12,
     )
@@ -469,11 +419,7 @@ def run_chemotype_interpretation(
     splits: dict[str, tuple[np.ndarray, np.ndarray]],
     model_factory,
 ) -> dict:
-    """Enrichment on scaffold + time splits, plus three-family surprise case study.
-
-    `model_factory` is a zero-arg callable returning a fresh unfitted classifier
-    (typically `lambda: clone(make_models(...)["logreg"])`).
-    """
+    """Enrichment on scaffold + time splits, plus historic-scaffold case study."""
     ensure_dirs()
     enrich_frames = []
     figures: list[str] = []
@@ -518,25 +464,21 @@ def run_chemotype_interpretation(
     if fig_case is not None:
         figures.append(str(fig_case))
 
-    narrative = _build_narrative(enrich_df, case_df)
-
     return {
         "chemotype_enrichment_csv": str(enrich_path) if enrich_path else None,
         "surprise_case_study_csv": str(case_path),
         "figures": figures,
-        "narrative": narrative,
+        "narrative": _build_narrative(enrich_df, case_df),
         "n_families_enriched": int(enrich_df["family"].nunique()) if not enrich_df.empty else 0,
     }
 
 
 def _build_narrative(enrich_df: pd.DataFrame, case_df: pd.DataFrame) -> dict:
-    """Short discovery-style bullets from enrichment + case study tables."""
     out: dict = {"temporal_failures": [], "case_study": []}
-    if enrich_df is not None and not enrich_df.empty:
+    if not enrich_df.empty:
         time = enrich_df[
             (enrich_df["split_name"] == "time") & (enrich_df["family"] != "other")
-        ].copy()
-        time = time.sort_values("error_lift", ascending=False)
+        ].sort_values("error_lift", ascending=False)
         for _, row in time.head(5).iterrows():
             if row["error_lift"] >= 1.1:
                 out["temporal_failures"].append(
@@ -548,7 +490,7 @@ def _build_narrative(enrich_df: pd.DataFrame, case_df: pd.DataFrame) -> dict:
                         "p": float(row["fisher_p_greater"]),
                     }
                 )
-    if case_df is not None and not case_df.empty:
+    if not case_df.empty:
         for fam, g in case_df.groupby("label"):
             scaf = g[g["split_name"] == "scaffold"]
             time = g[g["split_name"] == "time"]

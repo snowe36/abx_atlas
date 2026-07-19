@@ -1,11 +1,4 @@
-"""Optuna hyperparameter sweeps for the GPU deep models.
-
-Both sweeps only ever see the *outer* split's train set — the inner
-validation carve-out used for scoring trials never touches the held-out
-test scaffolds / random rows / future-year rows used for final reporting.
-Imports optuna at module scope (part of the optional `gpu` extra); only
-ever imported lazily by run.py when an HPO sweep is requested.
-"""
+"""Optuna sweeps for GPU models. Trials only see the outer train fold (never the reported test set)."""
 
 from __future__ import annotations
 

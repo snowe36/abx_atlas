@@ -1,11 +1,4 @@
-"""Fine-tuned pretrained chemical-language transformer (ChemBERTa-style) for
-Gram-negative QSAR (GPU fine-tuning).
-
-Mirrors the SplitResult contract used by the sklearn baselines / GNN so it
-merges into the same leakage-benchmark CSV/plot. Imports transformers/torch
-at module scope (part of the optional `gpu` extra) — safe since this module
-is only ever imported lazily by run.py when --with-pretrained is requested.
-"""
+"""Fine-tuned ChemBERTa QSAR; returns SplitResult like qsar.py. Lazy-imported under --with-pretrained."""
 
 from __future__ import annotations
 

@@ -29,9 +29,7 @@ class SplitResult:
 
 
 def make_models(random_state: int = 42) -> dict[str, object]:
-    # Interpretable linear baseline + tree ensembles on Morgan bits.
-    # HistGradientBoosting is the stronger classical control once leakage
-    # splits are in place (see README future→done for GBDT).
+    # logreg + RF + GBDT on Morgan bits
     return {
         "logreg": Pipeline(
             [

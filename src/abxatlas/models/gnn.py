@@ -1,12 +1,4 @@
-"""From-scratch graph neural network for Gram-negative QSAR (GPU-trained).
-
-Mirrors the SplitResult contract used by sklearn baselines in qsar.py so it
-merges seamlessly into the same leakage-benchmark CSV/plot.
-
-This module imports torch / torch_geometric at module scope (part of the
-optional `gpu` extra). It is only ever imported lazily by run.py when
---with-gnn is requested, so plain CPU installs never pay this import cost.
-"""
+"""From-scratch GNN QSAR; returns SplitResult like qsar.py. Lazy-imported under --with-gnn."""
 
 from __future__ import annotations
 
