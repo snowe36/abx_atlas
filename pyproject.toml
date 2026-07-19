@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abx-atlas"
-version = "0.2.0"
-description = "Leakage-aware antibacterial QSAR benchmark on public ChEMBL data (CPU baselines + optional GPU ablation)"
+version = "0.3.0"
+description = "An antibacterial chemical-space atlas revealing why QSAR fails under scaffold and temporal shift"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

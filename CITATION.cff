@@ -2,20 +2,20 @@ cff-version: 1.2.0
 message: >-
   If you use this software or the regenerated tables/figures, please cite
   this repository and the underlying ChEMBL data source below.
-title: "abx_atlas: A leakage-aware atlas of antibacterial chemical space"
+title: "abx_atlas: An antibacterial chemical-space atlas reveals why QSAR models fail under scaffold and temporal shift"
 type: software
-version: "0.2.0"
+version: "0.3.0"
 authors:
   - family-names: Snow
     given-names: Eric
 license: MIT
 repository-code: "https://github.com/snowe36/abx_atlas"
 abstract: >-
-  A reproducible atlas of antibacterial chemical space built from public
-  ChEMBL bioactivity data, with a leakage-aware benchmark (random vs.
-  scaffold vs. temporal splits) for Gram-negative activity QSAR, plus
-  optional GPU deep-learning models (GNN, fine-tuned chemical transformer)
-  evaluated on the same splits.
+  An antibacterial chemical-space atlas built from public ChEMBL bioactivity
+  data that shows why Gram-negative QSAR models fail under scaffold and
+  temporal shift. Includes named chemotype enrichment, a historic-scaffold
+  case study, and optional GPU deep-learning ablations (GNN, ChemBERTa) on
+  the same splits.
 keywords:
   - cheminformatics
   - antibacterial

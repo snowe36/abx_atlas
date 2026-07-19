@@ -1,6 +1,8 @@
 # abx_atlas
 
-**A reproducible, leakage-aware benchmark of antibacterial QSAR on public ChEMBL data** — map antibacterial chemical space, train CPU and optional GPU models, and stress-test whether apparent Gram-negative activity prediction is really scaffold / time leakage rather than generalizable signal.
+**An antibacterial chemical-space atlas reveals why QSAR models fail under scaffold and temporal shift.**
+
+A reproducible, leakage-aware benchmark on public ChEMBL data — map antibacterial chemical space, train CPU and optional GPU models, name the chemotypes that fail, and stress-test whether apparent Gram-negative activity prediction is really scaffold / time leakage rather than generalizable signal.
 
 [![CI](https://github.com/snowe36/abx_atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/snowe36/abx_atlas/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -16,17 +18,20 @@ Public chemogenomics tables make antibacterial QSAR look easy: Morgan fingerprin
 
 **Can models predict Gram-negative antibacterial activity from structure alone — and how much of that apparent skill is really scaffold / time leakage rather than generalizable signal?**
 
-This is an evaluation-hygiene / leakage-diagnostic problem with explicit negative controls (scaffold and temporal splits), not a leaderboard chase. Cell-envelope MoA labels motivated the project but are sparse at organism-level MIC scale; the main deliverable is the leakage story.
+This is an evaluation-hygiene / leakage-diagnostic problem with explicit negative controls (scaffold and temporal splits), not a leaderboard chase. Cell-envelope MoA labels motivated the project but are sparse at organism-level MIC scale. The main deliverable is the leakage story — plus a biological interpretation layer that names which chemotypes carry the failures.
+
+In antibacterial discovery, prospective failure often emerges not because models cannot fit chemistry, but because historical datasets overrepresent known chemotypes.
 
 ---
 
 ## What this repo builds
 
-1. **Download & curate** ChEMBL antibacterial activities across a full Gram+/− organism panel
+1. **Download & curate** ChEMBL antibacterial activities across 31 curated Gram-positive and Gram-negative organism groups
 2. **Map** antibacterial chemical space (Morgan FP atlas, Bemis–Murcko scaffolds, MoA / NP panels)
 3. **Benchmark** Gram-negative activity prediction under random, scaffold, and time splits
 4. **Interpret** failures (bit weights → substructures, FP/FN scaffolds, nearest-train-neighbor Tanimoto)
-5. **Ablate** against optional GPU deep models (from-scratch GNN + fine-tuned ChemBERTa) on the *same* splits — same protocol, honest comparison
+5. **Name the chemotypes** that fail under temporal shift, and run a three-scaffold surprise case study
+6. **Ablate** against optional GPU deep models (from-scratch GNN + fine-tuned ChemBERTa) on the *same* splits — same protocol, honest comparison
 
 <p align="center">
   <img src="reports/figures/fig3_leakage_rocauc.png" alt="Leakage-aware QSAR: ROC-AUC across random, scaffold, and time splits for logreg, RF, GBDT, GNN, and ChemBERTa" width="720"/>
@@ -46,10 +51,12 @@ This is an evaluation-hygiene / leakage-diagnostic problem with explicit negativ
 | Scaffold-split RF ROC-AUC | **0.84** |
 | Scaffold-split GBDT ROC-AUC | **0.82** (stronger than logreg; still trails RF) |
 | Time-split RF / GBDT ROC-AUC | **~0.55** / **0.54** |
-| Mean optimistic gap (random − scaffold, 5 models) | **~0.04** |
+| Prospective / temporal shift | RF **0.87 → 0.55** (random → time); best time model **ChemBERTa 0.60** |
 | Does a from-scratch GNN erase the leakage story? | **No** (scaffold 0.79; still trails RF) |
-| Does fine-tuned ChemBERTa erase it? | **No** on scaffold (0.79); **strongest on time** (0.60) |
+| Does molecular pretraining rescue generalization? | **No** on scaffold (ChemBERTa 0.79); **strongest on time** (0.60) |
 | Does more ChEMBL data fix scaffold generalization? | **Plateaus** (RF Δ ≈ +0.11 from 10%→100% train) |
+| Which chemotypes drive temporal failures? | **Sulfonamides** (1.26× error lift, n=228, *p*≪0.001) |
+| Historic scaffold case study | FQ supported · glycopeptides scarce (n=2) · polymyxins 75% scaffold error |
 
 ---
 
@@ -81,14 +88,14 @@ Antibacterial compounds occupy **broad** Morgan-FP space with substantial scaffo
 | Item | Detail |
 |------|--------|
 | Source | [ChEMBL](https://www.ebi.ac.uk/chembl/) via `chembl-webresource-client` |
-| Organisms | Full Gram+/− panel (**31** organisms; see `target_keywords.yaml`) |
+| Organisms | **31** curated Gram+/− organism groups (see `target_keywords.yaml`) |
 | Keep | Records with `pchembl_value`; types MIC / IC50 / Ki / EC50 / IZ / Potency |
 | Active | pChEMBL ≥ 5 (≈ ≤ 10 µM) |
 | Features | RDKit Morgan FP (radius 2, 2048 bits); optional atom/bond graphs for the GNN |
 | MoA bucket | Keyword match → `cell_envelope` / `other` / `unknown` |
-| NP flag | ChEMBL `natural_product` (fetched by default) |
+| NP flag | ChEMBL `natural_product` annotation (not manually curated NP classification) |
 | Envelope-tagged | **354** compounds (still a minority — organism-level MIC assays rarely name molecular targets) |
-| Natural products | **361** compounds (~0.9%) |
+| Natural products | **361** compounds (~0.9%; ChEMBL flags, not a curated NP atlas) |
 
 <p align="center">
   <img src="reports/figures/fig1_chemspace_atlas.png" alt="Antibacterial chemical space: Morgan FP PCA colored by organism class, Gram- activity, and MoA bucket" width="900"/>
@@ -146,7 +153,7 @@ CPU + GPU models on the expanded Gram− task (n=5,572). Deep models trained on 
 
 <p align="center"><em>Figure 3. Leakage-aware Gram-negative QSAR — RF leads on random/scaffold; GBDT sits between RF and logreg; ChemBERTa is strongest on the temporal holdout; none erase the drop.</em></p>
 
-Mean optimistic gap (random − scaffold, all five models): **~0.04**. A stronger classical baseline (GBDT) and both deep models leave the leakage story intact — RF still leads on random/scaffold, while ChemBERTa is the strongest on the temporal holdout.
+The punchline is temporal shift: RF falls from **0.87 → 0.55** (random → time), and even the best time-split model (ChemBERTa, **0.60**) stays far below random-split optimism. A stronger classical baseline (GBDT) and both deep models leave that leakage story intact — RF still leads on random/scaffold.
 
 Full metrics: [`data/processed/qsar_leakage_results.csv`](data/processed/qsar_leakage_results.csv) · HPO configs: [`data/processed/qsar_meta.json`](data/processed/qsar_meta.json).
 
@@ -154,7 +161,7 @@ Full metrics: [`data/processed/qsar_leakage_results.csv`](data/processed/qsar_le
 
 ## Learning curves & interpretation
 
-On held-out scaffolds, both CPU models improve with more train data then **plateau** (RF Δ ≈ +0.11, logreg Δ ≈ +0.07 from 10%→100% train). More ChEMBL rows alone do not erase chemotype / era bias.
+On held-out scaffolds, both CPU models improve with more train data then **plateau** (RF Δ ≈ +0.11, logreg Δ ≈ +0.07 from 10%→100% train). More ChEMBL rows alone do not erase chemotype or temporal bias.
 
 <p align="center">
   <img src="reports/figures/fig4_learning_curve.png" alt="Scaffold-split learning curve: ROC-AUC vs training set size for logreg and RF" width="640"/>
@@ -193,6 +200,51 @@ Interpretation on the scaffold-split logreg:
 <p align="center"><em>Scaffolds enriched in FP / FN on the scaffold-split test — model blind spots by chemotype.</em></p>
 
 **Takeaway:** apparent Gram− QSAR strength is partly **chemotype memorization** and **dataset era**. Scaffold- and time-aware evaluation makes that visible — and neither a stronger classical baseline (GBDT) nor the GPU models change that core finding.
+
+---
+
+## Which chemotypes fail?
+
+The leakage story is incomplete until it names chemical families. SMARTS + reference-drug similarity assign each Gram− compound to named antibacterial chemotypes (`resources/chemotype_families.yaml`). On the **temporal** holdout, logreg errors are enriched for:
+
+| Family | n (time test) | Error rate | Lift vs overall | Fisher *p* |
+|--------|---------------|------------|-----------------|------------|
+| **Sulfonamide** | 228 | 55% | **1.26×** | 8.5×10⁻⁵ |
+| **Oxazolidinone** | 79 | 52% | 1.18× | 0.088 |
+| Fluoroquinolone | 30 | 37% | 0.83× | n.s. |
+| Polymyxin | 7 | 29% | 0.65× | n.s. |
+
+**Temporal failures are enriched for sulfonamides** (and, more weakly, oxazolidinones) — not for the “famous” fluoroquinolone / polymyxin cores. That turns a split-metric into a discovery-facing claim: the model’s temporal failure is not uniform across chemical space; it concentrates in specific antibacterial chemotypes.
+
+<p align="center">
+  <img src="reports/figures/fig7_chemotype_temporal_failures.png" alt="Named chemotype families enriched in temporal-split QSAR failures" width="720"/>
+</p>
+
+<p align="center"><em>Figure 7. Chemotypes enriched in temporal-split failures — sulfonamides lead.</em></p>
+
+Full table: [`data/processed/qsar_chemotype_enrichment.csv`](data/processed/qsar_chemotype_enrichment.csv).
+
+---
+
+## Surprise case study: three historic scaffolds
+
+Like a natural-product atlas highlighting one molecule, we stress three historically important antibacterial scaffolds on the same leakage-aware splits:
+
+| Scaffold | n in Gram− task | What happens |
+|----------|-----------------|--------------|
+| **Fluoroquinolone** | 67 | Mostly supported — scaffold error 25%, time error 37%; nearest-train Tanimoto stays high (~0.55–0.76) |
+| **Glycopeptide** | **2** | Essentially absent from the Gram− ChEMBL task (classic Gram+ class) — the model never sees a meaningful test panel |
+| **Polymyxin** | 55 | Scaffold-split trap — **75% error** on held-out scaffolds despite mean NN Tanimoto **0.95** (near-duplicates with the wrong label story) |
+
+<p align="center">
+  <img src="reports/figures/fig8_surprise_case_study.png" alt="Case study of fluoroquinolone, glycopeptide, and polymyxin scaffolds under random, scaffold, and time splits" width="900"/>
+</p>
+
+<p align="center"><em>Figure 8. Three historic scaffolds under leakage-aware splits — support, error rate, and nearest-train Tanimoto.</em></p>
+
+**Why this matters:** “OOD” is not one thing. Glycopeptides are scarce in this task; polymyxins fail under scaffold holdout even when a near-neighbor exists; fluoroquinolones are comparatively well-supported. The atlas can say *where* the model succeeds or fails, not only *that* ROC-AUC drops.
+
+Details: [`data/processed/qsar_surprise_case_study.csv`](data/processed/qsar_surprise_case_study.csv).
 
 ---
 
@@ -242,14 +294,14 @@ This creates a pod (default `NVIDIA RTX A4000`, ~$0.17–0.25/hr), syncs the rep
 | Item | Detail |
 |------|--------|
 | Source | [ChEMBL](https://www.ebi.ac.uk/chembl/) activities |
-| Organisms | 31 Gram+/− (full keyword list) |
+| Organisms | 31 curated Gram+/− organism groups |
 | Raw assay rows | **47,213** |
 | Curated assay rows | **47,099** |
 | Compounds | **38,699** |
 | Bemis–Murcko scaffolds | **20,128** (ratio **0.52**) |
 | Gram− labeled | **5,572** · active rate **0.73** |
 | Envelope MoA bucket | **354** |
-| Natural-product flags | **361** |
+| Natural-product flags | **361** (ChEMBL annotations, not curated NP labels) |
 
 Cite ChEMBL when using regenerated tables ([CITATION.cff](CITATION.cff)).
 
@@ -273,8 +325,11 @@ Cite ChEMBL when using regenerated tables ([CITATION.cff](CITATION.cff)).
 - Prospective **external validation** sets beyond ChEMBL time splits
 - Attribution/explainability for the GNN (e.g. GNNExplainer) to extend the Figure 5–6 failure-analysis story
 - Larger HPO budgets and a multi-task head (Gram− + Gram+ + MoA bucket jointly)
+- Expand chemotype dictionaries (macrolide / tetracycline coverage) and external validation of the sulfonamide temporal-failure claim
 
 Done in v0.2: GBDT classical baseline · Morgan bit→substructure highlighting · committed metrics snapshots · fixture-based CI pipeline smoke test.
+
+Done in v0.3: named chemotype enrichment (Fig 7) · fluoroquinolone / glycopeptide / polymyxin surprise case study (Fig 8) · finding-first title.
 
 ---
 
@@ -313,8 +368,12 @@ pip install -e ".[gpu]" → python scripts/runpod/launch_gpu_job.py
 | Fig 4 learning curve | `reports/figures/fig4_learning_curve.png` |
 | Fig 5 neighbors | `reports/figures/fig5_error_neighbors.png` |
 | Fig 6 bit→substructure | `reports/figures/fig6_morgan_bit_substructures.png` |
+| Fig 7 chemotype failures | `reports/figures/fig7_chemotype_temporal_failures.png` |
+| Fig 8 surprise case study | `reports/figures/fig8_surprise_case_study.png` |
 | Metrics (committed) | `data/processed/qsar_leakage_results.csv`, `atlas_summary.csv`, `qsar_meta.json` |
 | Bit fragments | `data/processed/qsar_bit_substructures.csv` |
+| Chemotype enrichment | `data/processed/qsar_chemotype_enrichment.csv` |
+| Case study table | `data/processed/qsar_surprise_case_study.csv` |
 
 ---
 
