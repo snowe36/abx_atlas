@@ -14,6 +14,7 @@ from abxatlas.config import RANDOM_STATE
 from abxatlas.data.curate import load_curated
 from abxatlas.featurize.fingerprints import morgan_fps
 from abxatlas.featurize.graphs import smiles_to_graphs
+from abxatlas.models.chemotypes import run_chemotype_interpretation
 from abxatlas.models.interpret import run_interpretation
 from abxatlas.models.learning_curve import run_learning_curve
 from abxatlas.models.qsar import SplitResult, evaluate_split, make_models
@@ -119,6 +120,7 @@ def run_qsar(
     gap = _optimistic_gap(results_df)
 
     interpret_meta = _run_scaffold_interpretation(df, X, y, splits["scaffold"])
+    chemotype_meta = _run_chemotype_layer(df, X, y, splits)
     curve_meta = {}
     try:
         curve_meta = run_learning_curve(X, y, splits["scaffold"][0], splits["scaffold"][1])
@@ -132,6 +134,7 @@ def run_qsar(
         "optimistic_gap_roc_auc": gap,
         "primary_task": "gram_neg_active (pChEMBL >= 5)",
         "interpretation": _relativize_meta(interpret_meta),
+        "chemotypes": _relativize_meta(chemotype_meta),
         "learning_curve": _relativize_meta(curve_meta),
         "deep_models": _relativize_meta(deep_meta),
     }
@@ -149,6 +152,7 @@ def run_qsar(
             f"TP={ec.get('TP', 0)} FP={ec.get('FP', 0)} "
             f"FN={ec.get('FN', 0)} TN={ec.get('TN', 0)}"
         )
+    _print_chemotype_narrative(chemotype_meta)
     if curve_meta.get("plateau_hint"):
         print(f"Learning curve: {curve_meta['plateau_hint']}")
     return results_df
@@ -317,6 +321,42 @@ def _run_scaffold_interpretation(
     except Exception as exc:  # noqa: BLE001
         logger.warning("Interpretation failed: %s", exc)
         return {"error": str(exc)}
+
+
+def _run_chemotype_layer(
+    df: pd.DataFrame,
+    X: np.ndarray,
+    y: np.ndarray,
+    splits: dict[str, tuple[np.ndarray, np.ndarray]],
+) -> dict:
+    """Named chemotype enrichment + historic-scaffold surprise case study."""
+    try:
+        return run_chemotype_interpretation(
+            X,
+            y,
+            df["smiles"].tolist(),
+            splits,
+            model_factory=lambda: clone(make_models(RANDOM_STATE)["logreg"]),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Chemotype interpretation failed: %s", exc)
+        return {"error": str(exc)}
+
+
+def _print_chemotype_narrative(chemotype_meta: dict) -> None:
+    narr = (chemotype_meta or {}).get("narrative") or {}
+    temporal = narr.get("temporal_failures") or []
+    if temporal:
+        bits = [
+            f"{t['family']} (lift={t['error_lift']:.2f}, n={t['n']})" for t in temporal[:3]
+        ]
+        print("Temporal failures enriched for: " + "; ".join(bits))
+    cases = narr.get("case_study") or []
+    if cases:
+        bits = [
+            f"{c['family']} n={c['n_total']} ({c.get('ood_hint') or '?'})" for c in cases
+        ]
+        print("Surprise case study: " + "; ".join(bits))
 
 
 def _optimistic_gap(results: pd.DataFrame) -> dict:
