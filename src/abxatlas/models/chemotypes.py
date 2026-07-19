@@ -450,7 +450,7 @@ def plot_surprise_case_study(
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 1.05))
     fig.suptitle(
-        "Figure 8. Surprise case study — historic scaffolds the model treats as OOD",
+        "Figure 8. Surprise case study — three historic scaffolds under leakage-aware splits",
         y=1.12,
         fontsize=12,
     )

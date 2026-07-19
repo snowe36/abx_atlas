@@ -107,5 +107,59 @@
       },
       "model_name_hf": "seyonec/ChemBERTa-zinc-base-v1"
     }
+  },
+  "chemotypes": {
+    "chemotype_enrichment_csv": "data/processed/qsar_chemotype_enrichment.csv",
+    "surprise_case_study_csv": "data/processed/qsar_surprise_case_study.csv",
+    "figures": [
+      "reports/figures/fig7_chemotype_scaffold_failures.png",
+      "reports/figures/fig7_chemotype_temporal_failures.png",
+      "reports/figures/fig8_surprise_case_study.png"
+    ],
+    "narrative": {
+      "temporal_failures": [
+        {
+          "family": "Sulfonamide",
+          "error_lift": 1.256390977443609,
+          "error_rate": 0.5526315789473685,
+          "n": 228,
+          "p": 8.479849069887839e-05
+        },
+        {
+          "family": "Oxazolidinone",
+          "error_lift": 1.179901834151382,
+          "error_rate": 0.5189873417721519,
+          "n": 79,
+          "p": 0.08848242554829926
+        }
+      ],
+      "case_study": [
+        {
+          "family": "Fluoroquinolone",
+          "n_total": 67,
+          "scaffold_error_rate": 0.25,
+          "time_error_rate": 0.36666666666666664,
+          "scaffold_nn_tanimoto": 0.7575663777549286,
+          "ood_hint": "supported"
+        },
+        {
+          "family": "Glycopeptide",
+          "n_total": 2,
+          "scaffold_error_rate": NaN,
+          "time_error_rate": NaN,
+          "scaffold_nn_tanimoto": NaN,
+          "ood_hint": "scarce_in_task"
+        },
+        {
+          "family": "Polymyxin",
+          "n_total": 55,
+          "scaffold_error_rate": 0.75,
+          "time_error_rate": 0.2857142857142857,
+          "scaffold_nn_tanimoto": 0.9484372347389931,
+          "ood_hint": "supported"
+        }
+      ]
+    },
+    "n_families_enriched": 6
   }
 }

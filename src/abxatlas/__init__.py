@@ -1,3 +1,3 @@
-"""abx_atlas: cell-envelope antibacterial chemical space on CPU."""
+"""abx_atlas: antibacterial chemical-space atlas with leakage-aware QSAR."""
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
