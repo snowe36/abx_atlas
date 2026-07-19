@@ -1,0 +1,85 @@
+# Named antibacterial chemotype families for failure interpretation.
+# Assignment uses SMARTS (any match) and optional Morgan similarity to a reference.
+# Order = priority for the single "primary" family label (first match wins).
+
+families:
+  - id: fluoroquinolone
+    label: Fluoroquinolone
+    description: 4-oxoquinoline-3-carboxylic acids with a C6 fluorine (cipro-like)
+    smarts:
+      - "O=C(O)c1cn(*)c2cc(*)c(F)cc2c1=O"
+      - "O=C(O)c1cn(*)c2ccc(F)cc2c1=O"
+    reference_smiles: "O=C(O)c1cn(C2CC2)c2cc(N3CCNCC3)c(F)cc2c1=O"
+    reference_name: ciprofloxacin
+    case_study: true
+
+  - id: quinolone
+    label: Quinolone
+    description: Non-fluorinated 4-oxoquinoline-3-carboxylic acids
+    smarts:
+      - "O=C(O)c1cn(*)c2ccccc2c1=O"
+    # Exclude molecules already tagged fluoroquinolone (handled by priority order)
+
+  - id: glycopeptide
+    label: Glycopeptide
+    description: Large diaryl-ether peptide antibiotics (vancomycin-like)
+    smarts: []
+    # Structural heuristic: high MW + diaryl ether + many amides
+    min_mw: 1100
+    require_smarts:
+      - "c1ccc(Oc2ccccc2)cc1"
+    min_amide_count: 5
+    reference_smiles: "C[C@H]1O[C@H](O[C@H]2[C@H](O[C@@H]3O[C@@H](C)[C@H](O)[C@@H]([C@H]3O)N)[C@@H](O)[C@H](O)[C@@H](CO)O2)C[C@](C)(N)[C@H]1O"
+    # Fallback: Tanimoto to vancomycin core; full vanco SMILES is brittle across RDKit versions
+    similarity_reference_smiles: "CC(C)C[C@@H]1NC(=O)[C@H](CC(=O)N)NC(=O)[C@@H](NC(=O)c2cc(O)c(O)c(c2)Oc3ccc(cc3)C[C@H](NC)C(=O)N)c4ccc(O)c(c4)c5c(O)cc(O)cc5"
+    similarity_threshold: 0.35
+    case_study: true
+
+  - id: polymyxin
+    label: Polymyxin
+    description: Cyclic cationic lipopeptides with Dab-rich cores (colistin / polymyxin B)
+    smarts:
+      - "NCCC(N)C(=O)N"
+    min_mw: 900
+    min_amide_count: 6
+    reference_smiles: "CCC(C)CCCCC(=O)N[C@@H](CCN)C(=O)N[C@@H]([C@@H](C)O)C(=O)N[C@@H](CCN)C(=O)N[C@H]1CCNC(=O)[C@H]([C@@H](C)O)NC(=O)[C@H](CCN)NC(=O)[C@H](CCN)NC(=O)[C@H](CC(C)C)NC(=O)[C@@H](Cc2ccccc2)NC(=O)[C@H](CCN)NC1=O"
+    reference_name: polymyxin_B
+    similarity_threshold: 0.40
+    case_study: true
+
+  - id: beta_lactam
+    label: β-lactam
+    description: Four-membered β-lactam ring (penams, cephems, carbapenems, monobactams)
+    smarts:
+      - "[#7]1[#6](=O)[#6][#6]1"
+
+  - id: oxazolidinone
+    label: Oxazolidinone
+    description: 2-oxazolidinone antibacterials (linezolid-like)
+    smarts:
+      - "O=C1OCCN1c1ccccc1"
+
+  - id: sulfonamide
+    label: Sulfonamide
+    description: Aromatic sulfonamides (sulfa drugs / PABA competitors)
+    smarts:
+      - "c1ccc(S(=O)(=O)N)cc1"
+
+  - id: macrolide
+    label: Macrolide
+    description: Large-ring lactone antibacterials
+    smarts:
+      - "[#6]1[#6][#6][#6][#6][#6][#6][#6][#6][#6][#6][#6][#6]C(=O)O1"
+
+  - id: aminoglycoside
+    label: Aminoglycoside
+    description: Aminocyclitol glycosides (2-deoxystreptamine-like)
+    smarts:
+      - "NC1CC(N)C(O)C(O)C1O"
+
+  - id: nitroimidazole
+    label: Nitroimidazole
+    description: Nitro-substituted imidazoles
+    smarts:
+      - "c1ncn([N+](=O)[O-])c1"
+      - "c1cnc([N+](=O)[O-])n1C"
