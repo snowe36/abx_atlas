@@ -396,6 +396,12 @@ Bioactivity data from [ChEMBL](https://www.ebi.ac.uk/chembl/) (EMBL-EBI). Cite C
 
 ---
 
+## AI Assistance
+
+Development of this repository was assisted by Cursor (AI-powered code editor) for code generation, refactoring, documentation, and routine implementation tasks. All scientific design, algorithmic decisions, validation, testing, and final code review were performed by the author.
+
+---
+
 ## License
 
 MIT
