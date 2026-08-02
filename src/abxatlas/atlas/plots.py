@@ -12,16 +12,17 @@ from sklearn.decomposition import PCA
 from abxatlas.featurize.fingerprints import morgan_fps
 from abxatlas.featurize.scaffolds import scaffold_series
 from abxatlas.paths import FIGURES, ensure_dirs
+from abxatlas.viz.palette import CAT_COLORS, FACE, TEXT
 
 
 def _style():
     plt.rcParams.update(
         {
-            "figure.facecolor": "white",
-            "axes.facecolor": "white",
-            "axes.edgecolor": "#333333",
-            "axes.labelcolor": "#222222",
-            "text.color": "#222222",
+            "figure.facecolor": FACE,
+            "axes.facecolor": FACE,
+            "axes.edgecolor": TEXT,
+            "axes.labelcolor": TEXT,
+            "text.color": TEXT,
             "font.size": 11,
             "axes.titlesize": 13,
             "axes.labelsize": 11,
@@ -59,15 +60,7 @@ def plot_pca_chemspace(
     if color_by not in df.columns:
         color_by = "moa_bucket"
     cats = df[color_by].fillna("unknown").astype(str)
-    palette = {
-        "cell_envelope": "#1b4f72",
-        "other": "#b9770e",
-        "unknown": "#7f8c8d",
-        "True": "#1e8449",
-        "False": "#922b21",
-        "1": "#1e8449",
-        "0": "#922b21",
-    }
+    palette = dict(CAT_COLORS)
     for cat in sorted(cats.unique()):
         m = cats == cat
         ax.scatter(
@@ -119,7 +112,7 @@ def plot_np_envelope_chemspace(
             s=14,
             alpha=0.35,
             marker="x",
-            c="#95a5a6",
+            c="#A8B8B5",
             linewidths=0.7,
             label="Synthetic / other",
         )
@@ -130,7 +123,7 @@ def plot_np_envelope_chemspace(
             s=28,
             alpha=0.7,
             marker="o",
-            c="#1e8449",
+            c="#8FB996",
             edgecolors="none",
             label="Natural product",
         )
@@ -142,7 +135,7 @@ def plot_np_envelope_chemspace(
             alpha=0.9,
             marker="o",
             facecolors="none",
-            edgecolors="#1b4f72",
+            edgecolors="#5FA8A8",
             linewidths=1.2,
             label="Cell-envelope target",
         )
@@ -169,7 +162,7 @@ def plot_scaffold_counts(
     labels = [s if len(s) <= 28 else s[:25] + "…" for s in counts.index.astype(str)]
 
     fig, ax = plt.subplots(figsize=(8, 5.5))
-    ax.barh(range(len(counts))[::-1], counts.values, color="#1b4f72")
+    ax.barh(range(len(counts))[::-1], counts.values, color="#5FA8A8")
     ax.set_yticks(range(len(counts))[::-1])
     ax.set_yticklabels(labels, fontsize=8)
     ax.set_xlabel("Number of compounds")
@@ -193,7 +186,7 @@ def plot_np_vs_synthetic_moa(
     )
     ct = pd.crosstab(df["moa_bucket"], df["np_label"])
     fig, ax = plt.subplots(figsize=(7, 4.5))
-    ct.plot(kind="bar", ax=ax, color=["#1e8449", "#5d6d7e"], width=0.75)
+    ct.plot(kind="bar", ax=ax, color=["#8FB996", "#5A6F74"], width=0.75)
     ax.set_xlabel("MoA bucket")
     ax.set_ylabel("Compounds")
     ax.set_title("Natural product vs synthetic by target bucket")
@@ -224,7 +217,7 @@ def plot_gram_label_balance(
         ax.bar(
             ["Inactive", "Active"],
             [s.get(0, 0), s.get(1, 0)],
-            color=["#922b21", "#1e8449"],
+            color=["#E76F51", "#8FB996"],
         )
         ax.set_title(title)
         ax.set_ylabel("Compounds")
@@ -261,10 +254,10 @@ def plot_fig1_chemspace_atlas(
             "Assay organism class",
             gram,
             {
-                "Gram− only": "#1b4f72",
-                "Gram+ only": "#b9770e",
-                "Both": "#1e8449",
-                "Neither / unknown": "#bdc3c7",
+                "Gram− only": "#5FA8A8",
+                "Gram+ only": "#F4A261",
+                "Both": "#8FB996",
+                "Neither / unknown": "#D9E2E0",
             },
         ),
         (
@@ -272,7 +265,7 @@ def plot_fig1_chemspace_atlas(
             df["gram_neg_active"].map({1: "Active", 0: "Inactive"}).fillna("No label")
             if "gram_neg_active" in df.columns
             else pd.Series("No label", index=df.index),
-            {"Active": "#1e8449", "Inactive": "#922b21", "No label": "#bdc3c7"},
+            {"Active": "#8FB996", "Inactive": "#E76F51", "No label": "#D9E2E0"},
         ),
         (
             "MoA bucket",
@@ -280,9 +273,9 @@ def plot_fig1_chemspace_atlas(
             if "moa_bucket" in df.columns
             else pd.Series("unknown", index=df.index),
             {
-                "cell_envelope": "#1b4f72",
-                "other": "#b9770e",
-                "unknown": "#7f8c8d",
+                "cell_envelope": "#5FA8A8",
+                "other": "#F4A261",
+                "unknown": "#5A6F74",
             },
         ),
     ]
@@ -297,7 +290,7 @@ def plot_fig1_chemspace_atlas(
                 xy[m.to_numpy(), 1],
                 s=10,
                 alpha=0.5,
-                c=palette.get(cat, "#7f8c8d"),
+                c=palette.get(cat, "#5A6F74"),
                 edgecolors="none",
                 label=cat,
             )
@@ -333,7 +326,7 @@ def plot_fig2_scaffold_diversity(
     axes[0].bar(
         ["Compounds", "Unique scaffolds"],
         [n_comp, n_scaf],
-        color=["#1b4f72", "#5d6d7e"],
+        color=["#5FA8A8", "#5A6F74"],
         width=0.55,
     )
     axes[0].set_ylabel("Count")
@@ -346,7 +339,7 @@ def plot_fig2_scaffold_diversity(
         axes[1].hist(
             freq.values,
             bins=min(40, max(10, int(np.sqrt(len(freq))))),
-            color="#1b4f72",
+            color="#5FA8A8",
             edgecolor="white",
             log=True,
         )
