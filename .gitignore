@@ -37,3 +37,4 @@ venv/
 
 # Demo scratch (outputs may be committed)
 demo/scratch/
+demo/outputs/_fixture_figures/
