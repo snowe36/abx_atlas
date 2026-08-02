@@ -4,11 +4,31 @@
 
 A reproducible, leakage-aware benchmark on public ChEMBL data — map antibacterial chemical space, train CPU and optional GPU models, name the chemotypes that fail, and stress-test whether apparent Gram-negative activity prediction is really scaffold / time leakage rather than generalizable signal.
 
+Suite: [BGC](https://github.com/snowe36/bgc_atlas) (encode) → [Catalyst](https://github.com/snowe36/catalyst_atlas) (catalyze) → [Metabo](https://github.com/snowe36/metabo_atlas) (observe) → **ABX (function)**.
+
 [![CI](https://github.com/snowe36/abx_atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/snowe36/abx_atlas/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
+[![Demo](https://img.shields.io/badge/demo-5%20min-5FA8A8.svg)](demo/)
+[![Citation](https://img.shields.io/badge/CITATION-cff-E9C46A.svg)](CITATION.cff)
 
 Repo: [github.com/snowe36/abx_atlas](https://github.com/snowe36/abx_atlas)
+
+---
+
+## 5-minute demo
+
+No ChEMBL download required:
+
+```bash
+git clone https://github.com/snowe36/abx_atlas.git && cd abx_atlas
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+abx-demo
+# or: bash demo/run_demo.sh
+```
+
+Outputs: `demo/outputs/` — fixture leakage plot + full-atlas [`fig3_leakage_rocauc.png`](reports/figures/fig3_leakage_rocauc.png) when committed metrics are present.
 
 ---
 
