@@ -90,7 +90,9 @@ def plot_learning_curve(
     if curve.empty:
         return None
     fig, ax = plt.subplots(figsize=(7.2, 4.6))
-    colors = {"logreg": "#1b4f72", "rf": "#b9770e"}
+    from abxatlas.viz.palette import MODEL_COLORS
+
+    colors = MODEL_COLORS
     for model, g in curve.groupby("model_name"):
         g = g.sort_values("n_train")
         ax.plot(
@@ -101,7 +103,7 @@ def plot_learning_curve(
             color=colors.get(model, None),
             lw=2,
         )
-    ax.axhline(0.5, color="#999999", lw=0.8, ls="--")
+    ax.axhline(0.5, color="#A8B8B5", lw=0.8, ls="--")
     ax.set_xlabel("Training compounds (scaffold-split train subsample)")
     ax.set_ylabel("ROC-AUC on held-out scaffolds")
     ax.set_ylim(0.4, 1.0)

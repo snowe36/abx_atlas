@@ -456,13 +456,9 @@ def _plot_leakage(results: pd.DataFrame) -> None:
     fig, ax = plt.subplots(figsize=(7.5 + 0.6 * max(0, len(models) - 2), 4.8))
     x = np.arange(len(split_order))
     width = 0.8 / max(len(models), 1)
-    base_colors = {
-        "logreg": "#1b4f72",
-        "rf": "#b9770e",
-        "gbdt": "#117a65",
-        "gnn": "#1e8449",
-        "chemberta": "#6c3483",
-    }
+    from abxatlas.viz.palette import MODEL_COLORS
+
+    base_colors = dict(MODEL_COLORS)
     palette = plt.get_cmap("tab10")
     colors = {m: base_colors.get(m, palette(i % 10)) for i, m in enumerate(models)}
     for i, model in enumerate(models):
@@ -488,7 +484,7 @@ def _plot_leakage(results: pd.DataFrame) -> None:
     ax.set_ylabel("ROC-AUC")
     ax.set_ylim(0.4, 1.05)
     ax.set_title("Figure 3. Leakage-aware Gram-negative QSAR (hero result)")
-    ax.axhline(0.5, color="#999999", lw=0.8, ls="--")
+    ax.axhline(0.5, color="#A8B8B5", lw=0.8, ls="--")
     ax.legend(frameon=False, ncol=2 if len(models) > 4 else 1)
     fig.tight_layout()
     for name in ("qsar_leakage_rocauc.png", "fig3_leakage_rocauc.png"):

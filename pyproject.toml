@@ -38,6 +38,7 @@ gpu = [
 abx-download = "abxatlas.cli:download_main"
 abx-atlas = "abxatlas.cli:atlas_main"
 abx-qsar = "abxatlas.cli:qsar_main"
+abx-demo = "abxatlas.demo:run_demo_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
