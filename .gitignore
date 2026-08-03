@@ -34,3 +34,6 @@ venv/
 .DS_Store
 .ipynb_checkpoints/
 *.log
+
+# Demo scratch (outputs may be committed)
+demo/scratch/

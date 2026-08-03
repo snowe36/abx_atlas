@@ -206,9 +206,9 @@ def plot_chemotype_enrichment(
         return None
     top = sub.iloc[::-1]
     fig, ax = plt.subplots(figsize=(8.2, 4.8))
-    colors = ["#922b21" if r > 1.15 else "#1b4f72" for r in top["error_lift"]]
+    colors = ["#E76F51" if r > 1.15 else "#5FA8A8" for r in top["error_lift"]]
     ax.barh(top["label"], top["error_lift"], color=colors)
-    ax.axvline(1.0, color="#666666", lw=0.9, ls="--")
+    ax.axvline(1.0, color="#5A6F74", lw=0.9, ls="--")
     ax.set_xlabel("Error-rate lift vs overall held-out set")
     title_split = "temporal" if split_name == "time" else split_name
     ax.set_title(f"Figure 7. Chemotypes enriched in {title_split}-split failures")
@@ -219,7 +219,7 @@ def plot_chemotype_enrichment(
             f"n={int(row['n'])}  err={row['error_rate']:.0%}  p={row['fisher_p_greater']:.2g}",
             va="center",
             fontsize=8,
-            color="#333333",
+            color="#264653",
         )
     ax.set_xlim(0, max(2.0, float(top["error_lift"].max()) * 1.25))
     fig.tight_layout()
@@ -347,7 +347,7 @@ def plot_surprise_case_study(
         return None
 
     fig, axes = plt.subplots(1, 3, figsize=(11.5, 4.2), sharey=False)
-    panel_colors = {"scaffold": "#1b4f72", "time": "#922b21", "random": "#117a65"}
+    panel_colors = {"scaffold": "#5FA8A8", "time": "#E76F51", "random": "#8FB996"}
 
     for ax, fam_label in zip(axes, families, strict=False):
         sub = case_df[case_df["label"] == fam_label]
@@ -363,14 +363,14 @@ def plot_surprise_case_study(
             xs - width / 2,
             err,
             width=width,
-            color=[panel_colors.get(s, "#555") for s in split_order],
+            color=[panel_colors.get(s, "#5A6F74") for s in split_order],
             label="Error rate",
         )
         ax.bar(
             xs + width / 2,
             nn,
             width=width,
-            color="#b9770e",
+            color="#F4A261",
             alpha=0.85,
             label="Mean NN Tanimoto",
         )
@@ -387,7 +387,7 @@ def plot_surprise_case_study(
             va="top",
             ha="left",
             fontsize=8,
-            color="#333333",
+            color="#264653",
         )
         for i, (e, t, nt) in enumerate(zip(err, nn, n_test, strict=True)):
             if nt == 0:

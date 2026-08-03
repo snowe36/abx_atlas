@@ -166,13 +166,13 @@ def plot_logreg_weights(
     panel = pd.concat([neg, pos]).sort_values("weight")
 
     fig, ax = plt.subplots(figsize=(8, 6))
-    colors = ["#922b21" if w < 0 else "#1b4f72" for w in panel["weight"]]
+    colors = ["#E76F51" if w < 0 else "#5FA8A8" for w in panel["weight"]]
     ax.barh(
         [f"bit {b}" for b in panel["bit"]],
         panel["weight"],
         color=colors,
     )
-    ax.axvline(0, color="#666666", lw=0.8)
+    ax.axvline(0, color="#5A6F74", lw=0.8)
     ax.set_xlabel("Logistic regression coefficient")
     ax.set_title(f"Top ±{top_n} Morgan-bit weights (Gram-negative logreg)")
     fig.tight_layout()
@@ -341,8 +341,8 @@ def plot_error_scaffold_rates(
     ]
     fig, ax = plt.subplots(figsize=(8, 5.5))
     y = np.arange(len(top))
-    ax.barh(y - 0.15, top["fp_rate"], height=0.3, label="FP rate", color="#b9770e")
-    ax.barh(y + 0.15, top["fn_rate"], height=0.3, label="FN rate", color="#1b4f72")
+    ax.barh(y - 0.15, top["fp_rate"], height=0.3, label="FP rate", color="#F4A261")
+    ax.barh(y + 0.15, top["fn_rate"], height=0.3, label="FN rate", color="#5FA8A8")
     ax.set_yticks(y)
     ax.set_yticklabels(labels, fontsize=8)
     ax.set_xlabel("Rate within scaffold (scaffold-split test)")
@@ -423,12 +423,12 @@ def plot_neighbor_summary(
 
     order = [c for c in ("TP", "FP", "FN") if c in means.index]
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.8))
-    axes[0].bar(order, [means[c] for c in order], color=["#1e8449", "#b9770e", "#1b4f72"])
+    axes[0].bar(order, [means[c] for c in order], color=["#8FB996", "#F4A261", "#5FA8A8"])
     axes[0].set_ylim(0, 1)
     axes[0].set_ylabel("Mean Tanimoto to nearest train neighbor")
     axes[0].set_title("Structural proximity to training set")
     axes[1].bar(
-        order, [same_rate.get(c, 0) for c in order], color=["#1e8449", "#b9770e", "#1b4f72"]
+        order, [same_rate.get(c, 0) for c in order], color=["#8FB996", "#F4A261", "#5FA8A8"]
     )
     axes[1].set_ylim(0, 1)
     axes[1].set_ylabel("Fraction with same activity label")
